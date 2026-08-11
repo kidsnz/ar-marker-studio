@@ -1,0 +1,161 @@
+<!doctype html>
+<html lang="ja">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>AR Marker Studio — 生成せずに品質が分かる NFT マーカー作成ツール</title>
+<meta name="description" content="ARToolKit5 の NFT マーカーを、生成する前に品質判定できるツール。追従点の数を距離帯ごとに予測し、絵のどこが弱いのかをヒートマップで示す。生成もブラウザ内で完結する。">
+<link rel="stylesheet" href="css/style.css">
+</head>
+<body>
+
+<header>
+  <h1>AR MARKER STUDIO</h1>
+  <p class="lead">NFT マーカーを<strong>作る前に</strong>品質が分かる。<br>
+     追従点の数を距離帯ごとに予測し、絵のどこが弱いのかを示す。生成もこのページで終わる。</p>
+</header>
+
+<main>
+
+<!-- ============ 1. 画像 ============ -->
+<section id="step-image">
+  <h2>1. 元画像</h2>
+  <div id="drop" tabindex="0" role="button" aria-label="画像を選ぶ">
+    <p><strong>画像をドロップ</strong>、またはクリックして選ぶ</p>
+    <p class="hint">PNG 推奨。JPEG も読めるが、生成器と数値がわずかに食い違う</p>
+    <input type="file" id="file" accept="image/png,image/jpeg" hidden>
+  </div>
+  <div id="imginfo" hidden>
+    <canvas id="preview"></canvas>
+    <dl id="imgmeta"></dl>
+  </div>
+  <p id="alpha-warn" class="warn" hidden>
+    <strong>この画像にはアルファチャンネルがある。</strong>
+    NFT-Marker-Creator は RGBA の PNG を壊す（画像が横に繰り返され階調も反転した別物になる）。
+    生成する前に背景を白などで塗り潰して RGB にすること。
+  </p>
+</section>
+
+<!-- ============ 2. 設定 ============ -->
+<section id="step-config" hidden>
+  <h2>2. 設定</h2>
+  <div class="grid">
+    <label>マーカーの実寸幅
+      <span class="sub">印刷したときの横幅。ここから dpi が決まる</span>
+      <span class="row"><input type="number" id="size-mm" min="1" step="1" value="305"> mm</span>
+    </label>
+    <label>-dpi
+      <span class="sub">画像幅px ÷ 実寸インチ。実寸を変えると自動で入る</span>
+      <input type="number" id="dpi" min="1" step="0.01">
+    </label>
+    <label>-level
+      <span class="sub">追従点の密度。既定は2だが、基本は4にする</span>
+      <select id="level">
+        <option value="0">0 — 最も厳しい</option>
+        <option value="1">1</option>
+        <option value="2">2 — 生成器の既定</option>
+        <option value="3">3</option>
+        <option value="4" selected>4 — 最も点が採れる（推奨）</option>
+      </select>
+    </label>
+    <label>-leveli
+      <span class="sub">検出側（.fset3）の密度。追従の安定性には効かない</span>
+      <select id="leveli">
+        <option value="0">0</option>
+        <option value="1" selected>1 — 既定</option>
+        <option value="2">2</option>
+        <option value="3">3</option>
+      </select>
+    </label>
+  </div>
+  <p class="preset">よくある実寸:
+    <button type="button" class="mm" data-mm="305">12インチ 305mm</button>
+    <button type="button" class="mm" data-mm="180">7インチ 180mm</button>
+    <button type="button" class="mm" data-mm="297">A4横 297mm</button>
+    <button type="button" class="mm" data-mm="210">A4縦 210mm</button>
+    <button type="button" class="mm" data-mm="100">ポストカード 100mm</button>
+  </p>
+  <p><button type="button" id="run" class="primary">品質を判定する</button>
+     <span id="progress" class="hint"></span></p>
+</section>
+
+<!-- ============ 3. 判定 ============ -->
+<section id="step-result" hidden>
+  <h2>3. 判定</h2>
+  <div id="verdicts"></div>
+  <table id="bands">
+    <caption>距離帯ごとの追従点。<strong>合計は当てにならない。実際に使う帯の点数だけを見る</strong></caption>
+    <thead><tr><th>#</th><th>有効範囲 (dpi)</th><th>画素数</th><th>点</th><th></th></tr></thead>
+    <tbody></tbody>
+  </table>
+  <p class="hint" id="basis"></p>
+</section>
+
+<!-- ============ 4. ヒートマップ ============ -->
+<section id="step-heatmap" hidden>
+  <h2>4. 絵のどこが弱いか</h2>
+  <p class="row">
+    <label for="band">見る距離帯</label>
+    <select id="band"></select>
+    <span id="band-note" class="hint"></span>
+  </p>
+  <div class="panels">
+    <figure><canvas id="hm0"></canvas>
+      <figcaption><b>選ばれた追従点</b><br>丸は占有半径。この中には他の点が入れない</figcaption></figure>
+    <figure><canvas id="hm1"></canvas>
+      <figcaption><b>候補の強さ</b><br>
+        <span class="scale"><i class="s-good"></i>青＝紛らわしくない（良い）　<i class="s-bad"></i>赤＝紛らわしい</span></figcaption></figure>
+    <figure><canvas id="hm2"></canvas>
+      <figcaption><b>弱い領域</b><br>
+        <span class="scale"><i class="s-good"></i>青＝手がかりが近い　<i class="s-bad"></i>赤＝手がかりが無い</span><br>
+        外周22pxはテンプレートが収まらず構造的に対象外（灰色）</figcaption></figure>
+  </div>
+  <details>
+    <summary>点を増やすには（すべて実測で確認した手）</summary>
+    <ul>
+      <li><b>ニアレストネイバーで2倍に拡大する</b> — 最も効く。補間拡大は逆効果</li>
+      <li><b>-level=4 にする</b> — 既定の2から上げるだけで倍近くになる</li>
+      <li><b>絵を粗くする</b> — 大きな塊を離して複数置く。塊1個で数点増える</li>
+      <li><b>四辺すべてに構造を置く</b> — 上下だけでは横方向の位置が決まらない</li>
+      <li><b>正方形か4:3にする</b> — 横長は縦持ちで不利</li>
+      <li><b>グレーの階調を残す</b> — 白黒2値化は大幅に悪化する</li>
+    </ul>
+    <p>効かないと分かっているもの: 細線・ディザ・二重線・破線、細い枠（縮小後3px未満）、
+       <code>-dpi</code> の変更（距離帯が動くだけ）、4倍拡大（2倍より悪い）。</p>
+  </details>
+</section>
+
+<!-- ============ 5. 生成 ============ -->
+<section id="step-generate" hidden>
+  <h2>5. マーカーを生成する</h2>
+  <p class="hint">本物の生成器（ARToolKit5 の genTexData）をこのページの中で動かす。
+     サーバーには何も送らない。</p>
+  <p class="row">
+    <label for="name">ファイル名</label>
+    <input type="text" id="name" value="marker" size="16">
+    <button type="button" id="gen" class="primary">生成してダウンロード</button>
+    <span id="genstat" class="hint"></span>
+  </p>
+  <div id="genresult" hidden>
+    <p id="gensummary"></p>
+    <p id="genlinks" class="row"></p>
+    <p id="gencheck" class="hint"></p>
+  </div>
+</section>
+
+</main>
+
+<footer>
+  <p>生成部分は <a href="https://github.com/Carnaux/NFT-Marker-Creator">Carnaux/NFT-Marker-Creator</a>（MIT）の成果物をそのまま使っている。
+     判定・ヒートマップは実際の生成器のログと突き合わせて検証した独自実装。</p>
+  <p><a href="test/verify.html">検算ページ</a>
+     <a href="https://github.com/kidsnz/ar-marker-studio">ソース</a></p>
+</footer>
+
+<script src="js/png.js"></script>
+<script src="js/engine.js"></script>
+<script src="js/heatmap.js"></script>
+<script src="js/generate.js"></script>
+<script src="js/app.js"></script>
+</body>
+</html>
