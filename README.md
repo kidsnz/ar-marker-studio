@@ -171,6 +171,11 @@ test/               verification (fixtures.js / verify.js / verify.html)
 
 No build tools. Plain HTML/CSS/JS: `git push` and it is live.
 
+GitHub Pages caches assets for 10 minutes, so the `?v=` query on the `<script>` and
+`<link>` tags in `index.html` and `test/verify.html` matters: **bump that number whenever
+you change a JS or CSS file.** Without it a returning visitor can end up running an old
+script against a new one, which half-breaks the page.
+
 Source comments are in Japanese, since this started as a tool for one artist's own workflow.
 The UI and this README are in English.
 

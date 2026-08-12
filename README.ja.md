@@ -156,6 +156,11 @@ test/               検算（fixtures.js / verify.js / verify.html）
 
 ビルドツールは使わない。素の HTML/CSS/JS で、`git push` すればそのまま公開される。
 
+GitHub Pages は10分キャッシュするので、`index.html` と `test/verify.html` の
+`<script>` / `<link>` に付けてある `?v=` が効いてくる。**JS か CSS を変えたら、
+この数字を1つ上げること。** 忘れると、再訪した人の手元で古いスクリプトと新しい
+スクリプトが混ざって画面が半分壊れる。
+
 ## 速度の目安
 
 Chrome / M系 Mac、320×320 の画像で:
