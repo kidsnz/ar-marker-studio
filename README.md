@@ -93,16 +93,19 @@ float32 の逐次加算で追試して生成器のログの値を小数点以下
 （この検算は実際に誤りを検出している）。
 
 期待値は `test/fixtures.js`。マーカーの元画像は
-[murakamishinji.com のリポジトリ](https://github.com/kidsnz)の
-`projects/atariar/markers/` にあるもの。
+murakamishinji.com のリポジトリの `projects/atariar/markers/` にあるもの
+（このリポジトリと並べて置いている場合は下のパスでそのまま通る）。
 
 ```bash
 # Node で
-node test/verify.js /path/to/projects/atariar/markers
+node test/verify.js ../website/projects/atariar/markers
 
-# ブラウザで（test/verify.html を開いてフォルダを選ぶ）
+# ブラウザで（開いたら test/verify.html でフォルダを選ぶ）
 python3 -m http.server 8000
 ```
+
+判定エンジンには Python 版（`website/tools/predict_features.py`）もあり、
+同じ期待値で `--self-test` が通る。**この2つは互いの答え合わせになっている。**
 
 ---
 
