@@ -8,7 +8,7 @@
 <!-- js / css を更新したら ?v= の数字を1つ上げる。
      GitHub Pages は10分キャッシュするため、これが無いと利用者の手元で
      古いファイルと新しいファイルが混ざって画面が壊れることがある -->
-<link rel="stylesheet" href="css/style.css?v=3">
+<link rel="stylesheet" href="css/style.css?v=4">
 </head>
 <body>
 
@@ -111,9 +111,30 @@
   <p class="hint" id="basis"></p>
 </section>
 
-<!-- ============ 4. Heatmap ============ -->
+<!-- ============ 4. Distance ============ -->
+<section id="step-distance" hidden>
+  <h2 data-i18n="dist.title">4. How far away it still works</h2>
+  <div id="dist-summary"></div>
+  <table id="dist">
+    <thead><tr>
+      <th data-i18n="dist.col">Distance</th>
+      <th data-i18n="dist.updpi">upright dpi</th>
+      <th data-i18n="dist.uppts">points</th>
+      <th data-i18n="dist.sidedpi">sideways dpi</th>
+      <th data-i18n="dist.sidepts">points</th>
+      <th></th>
+    </tr></thead>
+    <tbody></tbody>
+  </table>
+  <p class="hint" data-i18n="dist.basis">Based on the camera in ARnft's standard camera_para.dat
+     (640×480, fx=609.4, so 55.4° across the long axis). A different lens shifts every distance
+     proportionally. Closer than the fit distance the marker runs off the frame, so the counts
+     there are optimistic.</p>
+</section>
+
+<!-- ============ 5. Heatmap ============ -->
 <section id="step-heatmap" hidden>
-  <h2 data-i18n="step4.title">4. Where the artwork is weak</h2>
+  <h2 data-i18n="step4.title">5. Where the artwork is weak</h2>
   <p class="row">
     <label for="band" data-i18n="hm.band">Distance band</label>
     <select id="band"></select>
@@ -150,7 +171,7 @@
 
 <!-- ============ 5. Generate ============ -->
 <section id="step-generate" hidden>
-  <h2 data-i18n="step5.title">5. Generate the marker</h2>
+  <h2 data-i18n="step5.title">6. Generate the marker</h2>
   <p class="hint" data-i18n="gen.hint">The real generator (ARToolKit5's genTexData) runs inside this page.
      Nothing is sent to a server.</p>
   <p class="row">
@@ -177,11 +198,11 @@
      <a href="https://github.com/kidsnz/ar-marker-studio" data-i18n="foot.source">Source</a></p>
 </footer>
 
-<script src="js/i18n.js?v=3"></script>
-<script src="js/png.js?v=3"></script>
-<script src="js/engine.js?v=3"></script>
-<script src="js/heatmap.js?v=3"></script>
-<script src="js/generate.js?v=3"></script>
-<script src="js/app.js?v=3"></script>
+<script src="js/i18n.js?v=4"></script>
+<script src="js/png.js?v=4"></script>
+<script src="js/engine.js?v=4"></script>
+<script src="js/heatmap.js?v=4"></script>
+<script src="js/generate.js?v=4"></script>
+<script src="js/app.js?v=4"></script>
 </body>
 </html>

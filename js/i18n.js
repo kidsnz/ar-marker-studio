@@ -85,8 +85,25 @@
     'progress.prep': '準備中…',
     'progress.final': 'まとめ中…',
 
-    // --- 4. ヒートマップ ---
-    'step4.title': '4. 絵のどこが弱いか',
+    // --- 4. 使える距離 ---
+    'dist.title': '4. どこまで離れても効くか',
+    'dist.col': '距離',
+    'dist.updpi': '縦持ちdpi',
+    'dist.uppts': '点',
+    'dist.sidedpi': '横持ちdpi',
+    'dist.sidepts': '点',
+    'dist.basis': 'ARnft 標準の camera_para.dat のカメラを前提にしている'
+      + '（640×480、fx=609.4 なので長辺方向の画角 55.4度）。レンズが違えば距離が比例してずれる。'
+      + '画面に収まる距離より近づくとマーカーがはみ出すので、そこの点数は過大評価になる。',
+    'dist.range': '{who}: {min} 〜 {max} で安定（{n}点以上）',
+    'dist.rangeMin': '{who}: {min} 〜 {max} で追従は成立する（{n}点以上）',
+    'dist.none': '{who}: どの距離でも {n} 点に届かない',
+    'dist.overflow': '画面からはみ出す',
+    'dist.patchy': '点数は距離に対して滑らかに減らない（距離帯の重なり方が不規則なため）。'
+      + 'これは最も長く連続している区間で、全部で {n} 区間に分かれている。',
+
+    // --- 5. ヒートマップ ---
+    'step4.title': '5. 絵のどこが弱いか',
     'hm.band': '見る距離帯',
     'tbl.rangeFmt': '{min} 〜 {max}',
     'hm.opt': '{i}: {dpi} dpi（{w}×{h}、{n}点）',
@@ -110,7 +127,7 @@
       + '<code>-dpi</code> の変更（距離帯が動くだけ）、4倍拡大（2倍より悪い）。',
 
     // --- 5. 生成 ---
-    'step5.title': '5. マーカーを生成する',
+    'step5.title': '6. マーカーを生成する',
     'gen.hint': '本物の生成器（ARToolKit5 の genTexData）をこのページの中で動かす。サーバーには何も送らない。',
     'gen.name': 'ファイル名',
     'btn.gen': '生成してダウンロード',

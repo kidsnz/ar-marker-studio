@@ -529,6 +529,85 @@
     return Math.min(region[0] / (wMm / 25.4), region[1] / (hMm / 25.4));
   }
 
+  // ------------------------------------------------------------------
+  // 使える距離（ar2GetResolution2 と同じ考え方）
+  // ------------------------------------------------------------------
+  /**
+   * ARnft が標準で使う camera_para.dat から求めた画角。
+   * 640x480 基準で fx=609.37, fy=606.52 なので、
+   * 水平 2*atan(320/609.37) = 55.4度、垂直 2*atan(240/606.52) = 43.2度。
+   * 別のレンズを使う場合は距離が比例してずれる。
+   */
+  var CAMERA_FOV_LONG = 55.4;    // センサーの長辺方向の画角（度）
+
+  /**
+   * 処理キャンバス上での焦点距離（px）。持ち方で変わる。
+   * 横持ちは長辺が 320px、縦持ちは映像が回るので長辺が 240px になる。
+   */
+  function focalPx(region) {
+    var longPx = Math.max(region[0], region[1]);
+    return (longPx / 2) / Math.tan(CAMERA_FOV_LONG / 2 * Math.PI / 180);
+  }
+
+  /** 距離 z(mm) から見たときの見かけ dpi */
+  function dpiAtDistance(region, z) {
+    return focalPx(region) / z * 25.4;
+  }
+
+  /** マーカー全体が画面に収まる最短距離(mm)。これより近いと画面からはみ出す */
+  function fitDistance(region, wMm, hMm) {
+    var f = focalPx(region);
+    return Math.max(f * wMm / region[0], f * hMm / region[1]);
+  }
+
+  /**
+   * 距離ごとの見通しを返す。
+   * 「30cmから2mで使いたい」に答えるためのもの。
+   */
+  function distanceTable(bands, region, wMm, hMm, distancesMm) {
+    var fit = fitDistance(region, wMm, hMm);
+    return distancesMm.map(function (z) {
+      var ap = dpiAtDistance(region, z);
+      return {
+        mm: z,
+        dpi: ap,
+        points: usablePoints(bands, ap),
+        fits: z >= fit,      // false なら画面からはみ出す（点数は過大評価）
+        verdict: verdict(usablePoints(bands, ap))
+      };
+    });
+  }
+
+  /**
+   * minPoints 以上の点がある距離の範囲(mm)。
+   *
+   * **点数は距離に対して滑らかに減らない。** 距離帯どうしの重なり方が
+   * 不規則なので、点数は上下に飛ぶ（実測: 39cm=14点 / 41cm=8点 / 49cm=12点）。
+   * なので「最小〜最大」を返すと嘘になる。いちばん長く連続している区間を返し、
+   * 区間がいくつに分かれているかも一緒に返す。
+   *
+   * 見つからなければ null。
+   */
+  function usableRange(bands, region, wMm, hMm, minPoints) {
+    var fit = fitDistance(region, wMm, hMm);
+    var start = Math.max(100, Math.ceil(fit / 10) * 10);
+    var best = null, cur = null, segments = 0;
+    // 1cm 刻みで走査する（距離帯は離散なので解析的には解けない）
+    for (var z = start; z <= 5000; z += 10) {
+      var n = usablePoints(bands, dpiAtDistance(region, z));
+      if (n >= minPoints) {
+        if (cur === null) { cur = { min: z, max: z }; segments++; }
+        else cur.max = z;
+      } else if (cur !== null) {
+        if (!best || cur.max - cur.min > best.max - best.min) best = cur;
+        cur = null;
+      }
+    }
+    if (cur !== null && (!best || cur.max - cur.min > best.max - best.min)) best = cur;
+    if (!best) return null;
+    return { min: best.min, max: best.max, fit: fit, segments: segments };
+  }
+
   /** 見かけ dpi ap のとき、実際に使える追従点の数（帯をまたぐので合算する） */
   function usablePoints(bands, ap) {
     return bands.reduce(function (s, b) {
@@ -619,6 +698,8 @@
     featureMap: featureMap, selectFeatures: selectFeatures, predict: predict,
     evaluate: evaluate, apparentDpi: apparentDpi, usablePoints: usablePoints,
     verdict: verdict, bandForDpi: bandForDpi,
+    CAMERA_FOV_LONG: CAMERA_FOV_LONG, focalPx: focalPx, dpiAtDistance: dpiAtDistance,
+    fitDistance: fitDistance, distanceTable: distanceTable, usableRange: usableRange,
     convexHull: convexHull, spreadArea: spreadArea, pointsAt: pointsAt,
     selectable: selectable
   };

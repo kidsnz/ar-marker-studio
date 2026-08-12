@@ -65,6 +65,23 @@ Measured against real devices:
 | 17% | 9 | mostly stable |
 | 33% | 14 | stable |
 
+## How far away does it work?
+
+The tool also answers "will this hold up from 30cm to 2m?". It derives the camera's field of
+view from ARnft's standard `camera_para.dat` (640×480, fx=609.37, so 55.4° across the long
+axis) and works out the apparent dpi at each distance:
+
+```
+focal length on the processing canvas = (long side px / 2) / tan(fov / 2)
+   long side px = 320 held sideways, 240 held upright (the video rotates)
+apparent dpi = focal length / distance in mm × 25.4
+```
+
+**Careful: the count does not fall off smoothly with distance.** The bands overlap unevenly, so
+the number of points jumps up and down. Measured on satoshi/03 held upright: 39cm gives 14
+points, 41cm gives 8, 49cm gives 12 again. Reporting a plain "from X to Y" would be a lie, so
+the tool reports the longest continuous stretch and how many separate stretches there are.
+
 ## Why the total point count is meaningless
 
 A `.fset` splits its points across distance bands (scales). At runtime only the band matching

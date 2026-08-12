@@ -59,7 +59,14 @@
     'err.image': 'Could not read the image: {m}',
     'err.dpi': 'That dpi is not valid',
     'err.calc': 'Calculation failed: {m}',
-    'err.gen': 'Generation failed: {m}'
+    'err.gen': 'Generation failed: {m}',
+    'dist.range': '{who}: stable between {min} and {max} ({n}+ points)',
+    'dist.rangeMin': '{who}: tracks at all between {min} and {max} ({n}+ points)',
+    'dist.none': '{who}: never reaches {n} points at any distance',
+    'dist.overflow': 'marker runs off the frame',
+    'dist.patchy': 'The count does not fall off smoothly with distance, because the bands '
+      + 'overlap unevenly. This is the longest continuous stretch; there are {n} separate '
+      + 'stretches in total.'
   };
   Object.keys(EN).forEach(function (k) {
     if (self.I18N_EN[k] == null) self.I18N_EN[k] = EN[k];
@@ -249,7 +256,9 @@
     sel.value = Engine.bandForDpi(r.bands, ev.portrait.dpi);
     sel.onchange = drawHeatmap;
 
-    ['step-result', 'step-heatmap', 'step-generate'].forEach(function (s) { $(s).hidden = false; });
+    showDistances(ev);
+    ['step-result', 'step-distance', 'step-heatmap', 'step-generate']
+      .forEach(function (s) { $(s).hidden = false; });
     $('name').value = state.name;
     drawHeatmap();
   }
@@ -271,6 +280,57 @@
           sel: d.selectable, spread: (d.spread * 100).toFixed(1), fb: d.fallback
         }) + '</div>'
       + note;
+  }
+
+  // ------------------------------------------------------------------
+  // 4-b. 使える距離
+  // ------------------------------------------------------------------
+  var DISTANCES_MM = [200, 300, 400, 500, 750, 1000, 1500, 2000, 3000];
+
+  function fmtMm(mm) {
+    return mm >= 1000 ? (mm / 1000).toFixed(mm % 1000 ? 1 : 0) + 'm'
+                      : Math.round(mm / 10) + 'cm';
+  }
+
+  function showDistances(ev) {
+    var r = state.result;
+    var wMm = ev.widthMm, hMm = ev.heightMm;
+    var pt = Engine.distanceTable(r.bands, Engine.REGION_PORTRAIT, wMm, hMm, DISTANCES_MM);
+    var ls = Engine.distanceTable(r.bands, Engine.REGION_LANDSCAPE, wMm, hMm, DISTANCES_MM);
+
+    $('dist-summary').innerHTML = [
+      ['res.portrait.short', Engine.REGION_PORTRAIT],
+      ['res.landscape.short', Engine.REGION_LANDSCAPE]
+    ].map(function (e) {
+      var who = t(e[0]);
+      var good = Engine.usableRange(r.bands, e[1], wMm, hMm, Engine.GOOD);
+      var any = Engine.usableRange(r.bands, e[1], wMm, hMm, Engine.TRACK_MIN);
+      var use = good || any, key = good ? 'dist.range' : 'dist.rangeMin';
+      var cls = good ? 'v-good' : 'v-mid';
+      if (!use) {
+        return '<div class="v-bad">' + t('dist.none', { who: who, n: Engine.GOOD }) + '</div>';
+      }
+      var line = '<div class="' + cls + '">' + t(key, {
+        who: who, min: fmtMm(use.min), max: fmtMm(use.max),
+        n: good ? Engine.GOOD : Engine.TRACK_MIN }) + '</div>';
+      if (use.segments > 1) {
+        line += '<div class="subrow">' + t('dist.patchy', { n: use.segments }) + '</div>';
+      }
+      return line;
+    }).join('');
+
+    $('dist').querySelector('tbody').innerHTML = DISTANCES_MM.map(function (z, i) {
+      var a = pt[i], b = ls[i];
+      var best = Math.max(a.points, b.points);
+      return '<tr class="' + (best >= Engine.GOOD ? 'used' : '') + '">'
+        + '<td>' + fmtMm(z) + '</td>'
+        + '<td>' + a.dpi.toFixed(1) + '</td>'
+        + '<td class="' + vClass(a.points) + '">' + a.points + '</td>'
+        + '<td>' + b.dpi.toFixed(1) + '</td>'
+        + '<td class="' + vClass(b.points) + '">' + b.points + '</td>'
+        + '<td>' + (a.fits ? '' : '<span class="tag">' + t('dist.overflow') + '</span>')
+        + '</td></tr>';
+    }).join('');
   }
 
   function drawHeatmap() {
