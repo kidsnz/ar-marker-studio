@@ -51,8 +51,12 @@
 
   // --- 実行時（追従）の仕様。lib/SRC/AR2/tracking.c と selectTemplate.c より ---
   // これらは「点が何点あればいいのか」を決めている本体なので、判定に反映する。
+  // 【注意】ARToolKit5 の既定値をそのまま使ってはいけない。実際に動いている
+  // jsartoolkitNFT は起動時に setupAR2() で上書きする（ARToolKitNFT_js.cpp）:
+  //   ar2SetTrackingThresh(5.0) / ar2SetSimThresh(0.50) / ar2SetSearchFeatureNum(16)
+  //   ar2SetSearchSize(6) / ar2SetTemplateSize1(6) / ar2SetTemplateSize2(6)
   var TRACK_MIN = 3;          // これを切ると追従が止まる（tracking.c の `if(num < 3) return -3`）
-  var TRACK_PER_FRAME = 10;   // 1フレームで試す点の数（AR2_DEFAULT_SEARCH_FEATURE_NUM）
+  var TRACK_PER_FRAME = 16;   // 1フレームで試す点の数。既定の10ではなく setupAR2() の16
   var EDGE_MARGIN = 1 / 8;    // 画面の外周1/8にある点は絶対に選ばれない（ar2SelectTemplate）
 
   /**
