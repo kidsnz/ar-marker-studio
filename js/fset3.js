@@ -28,6 +28,10 @@
   var FEATURE_SIZE = 108;                       // 96 + angle(4) + scale(4) + maxima(4)
   var REC = 8 + 8 + FEATURE_SIZE + 4 + 4;       // 1点あたり 132 バイト
 
+  // 点を1つも持たないダミー段の段番号。検出器の不具合を避けるために先頭に挿す
+  // （website の tools/fix_fset3.py が入れる）。中身が無いので一覧からは除く。
+  var DUMMY_IMAGE_NO = 9999;
+
   /**
    * .fset3 を読む。
    * @param {Uint8Array|ArrayBuffer} bytes
@@ -66,6 +70,7 @@
         var h = dv.getInt32(off + 4, true);
         var no2 = dv.getInt32(off + 8, true);
         off += 12;
+        if (no2 === DUMMY_IMAGE_NO) continue;     // 中身のないダミー段は数えない
         levels.push({ no: no2, w: w, h: h, count: perImage[no2] || 0 });
       }
     }
