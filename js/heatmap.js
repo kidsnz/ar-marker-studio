@@ -98,6 +98,15 @@
     // --- 1面目: 選ばれた追従点 ---
     var c0 = canvases[0].getContext('2d');
     drawBase(c0, band.bw, W, H, S, false);
+    // 実行時は画面の外周1/8にある点を絶対に選ばない（ar2SelectTemplate）。
+    // マーカーが画面いっぱいに写る前提で、その帯を落として示す
+    var m = 1 / 8, cw = W * S, ch = H * S;
+    c0.fillStyle = 'rgba(128,128,128,0.4)';
+    c0.fillRect(0, 0, cw, ch * m);
+    c0.fillRect(0, ch * (1 - m), cw, ch * m);
+    c0.fillRect(0, ch * m, cw * m, ch * (1 - 2 * m));
+    c0.fillRect(cw * (1 - m), ch * m, cw * m, ch * (1 - 2 * m));
+
     c0.lineWidth = Math.max(1, S * 0.6);
     c0.font = (9 * Math.max(1, S * 0.7)) + 'px ui-monospace, monospace';
     c0.textBaseline = 'middle';

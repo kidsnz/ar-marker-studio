@@ -49,6 +49,64 @@
   var REGION_PORTRAIT = [180, 240];    // 縦持ち: 左右に黒帯が入り実効180px
   var GOOD = 12, POOR = 5;             // 実機の体感と対応させた判定の目安
 
+  // --- 実行時（追従）の仕様。lib/SRC/AR2/tracking.c と selectTemplate.c より ---
+  // これらは「点が何点あればいいのか」を決めている本体なので、判定に反映する。
+  var TRACK_MIN = 3;          // これを切ると追従が止まる（tracking.c の `if(num < 3) return -3`）
+  var TRACK_PER_FRAME = 10;   // 1フレームで試す点の数（AR2_DEFAULT_SEARCH_FEATURE_NUM）
+  var EDGE_MARGIN = 1 / 8;    // 画面の外周1/8にある点は絶対に選ばれない（ar2SelectTemplate）
+
+  /**
+   * 凸包（monotone chain）。最大四角形の頂点は必ず凸包の上にあるので、
+   * 総当たりの前にここまで絞る。
+   */
+  function convexHull(pts) {
+    if (pts.length < 4) return pts.slice();
+    var p = pts.slice().sort(function (a, b) { return a[0] - b[0] || a[1] - b[1]; });
+    var cross = function (o, a, b) {
+      return (a[0] - o[0]) * (b[1] - o[1]) - (a[1] - o[1]) * (b[0] - o[0]);
+    };
+    var lower = [], upper = [], i;
+    for (i = 0; i < p.length; i++) {
+      while (lower.length >= 2 &&
+             cross(lower[lower.length - 2], lower[lower.length - 1], p[i]) <= 0) lower.pop();
+      lower.push(p[i]);
+    }
+    for (i = p.length - 1; i >= 0; i--) {
+      while (upper.length >= 2 &&
+             cross(upper[upper.length - 2], upper[upper.length - 1], p[i]) <= 0) upper.pop();
+      upper.push(p[i]);
+    }
+    lower.pop();
+    upper.pop();
+    return lower.concat(upper);
+  }
+
+  /**
+   * 点の散らばり具合。凸包の面積（マーカー全体を 1 とした割合）を返す。
+   *
+   * **これは思いつきの指標ではない。** ar2SelectTemplate は追従の最初の4点を
+   *   1点目 = 画面中心から最も遠い点
+   *   2点目 = 1点目から最も遠い点
+   *   3点目 = 1〜2点目を結ぶ線から最も離れた点
+   *   4点目 = 四角形の面積が最大になる点
+   * という順で選ぶ。つまり実行時は「点が作る四角形の面積」を最大化している。
+   * 凸包の面積はその上限で、凸包がちょうど四角形のときは一致する。
+   * 同じ点数でも固まっていれば小さい四角形しか作れず、姿勢が不安定になる。
+   *
+   * 実測（satoshi の3枚、縦持ち）:
+   *   1% = 大小に飛ぶ / 17% = ほぼ安定 / 33% = 安定
+   */
+  function spreadArea(pts) {
+    var h = convexHull(pts);
+    if (h.length < 3) return 0;
+    var n = h.length, area = 0;
+    for (var i = 0; i < n; i++) {
+      var p1 = h[i], p2 = h[(i + 1) % n];
+      area += p1[0] * p2[1] - p2[0] * p1[1];
+    }
+    return Math.abs(area) / 2;
+  }
+
   /** C の lroundf（0から遠い方へ丸める） */
   function lroundf(x) {
     return x >= 0 ? Math.floor(x + 0.5) : -Math.floor(-x + 0.5);
@@ -478,7 +536,41 @@
     }, 0);
   }
 
-  function verdict(n) { return n >= GOOD ? '安定' : (n >= POOR ? '不足ぎみ' : '暴れる'); }
+  /**
+   * 見かけ dpi ap で使われる帯の点を、マーカー全体を 1x1 とした座標で集める。
+   * @param strict false なら実行時のフォールバック範囲 [mindpi/2, maxdpi*2] まで広げる
+   */
+  function pointsAt(bands, ap, strict) {
+    var out = [];
+    bands.forEach(function (b) {
+      var lo = strict ? b.mindpi : b.mindpi / 2;
+      var hi = strict ? b.maxdpi : b.maxdpi * 2;
+      if (ap < lo || ap > hi) return;
+      b.points.forEach(function (p) {
+        out.push([(p.x + 0.5) / b.W, (p.y + 0.5) / b.H]);
+      });
+    });
+    return out;
+  }
+
+  /** 実行時が実際に選びうる点だけに絞る（画面の外周1/8は選ばれない） */
+  function selectable(pts) {
+    return pts.filter(function (p) {
+      return p[0] >= EDGE_MARGIN && p[0] <= 1 - EDGE_MARGIN
+          && p[1] >= EDGE_MARGIN && p[1] <= 1 - EDGE_MARGIN;
+    });
+  }
+
+  /**
+   * 判定。**3点を切ると追従そのものが止まる**（tracking.c の `if(num < 3) return -3`）
+   * ので、そこを独立した段として扱う。
+   */
+  function verdict(n) {
+    if (n < TRACK_MIN) return 'cannot';   // 追従不可
+    if (n < POOR) return 'limit';         // ギリギリ。1点失うと止まる
+    if (n < GOOD) return 'marginal';      // 不足ぎみ
+    return 'stable';                      // 安定
+  }
 
   /** 予測結果に、実寸と持ち方から見た判定を足す */
   function evaluate(result, sizeMm) {
@@ -491,8 +583,17 @@
     };
     [['portrait', REGION_PORTRAIT], ['landscape', REGION_LANDSCAPE]].forEach(function (e) {
       var ap = apparentDpi(wMm, hMm, e[1]);
-      r[e[0]] = { dpi: ap, points: usablePoints(result.bands, ap) };
-      r[e[0]].verdict = verdict(r[e[0]].points);
+      var strict = pointsAt(result.bands, ap, true);
+      var loose = pointsAt(result.bands, ap, false);
+      var sel = selectable(strict);
+      r[e[0]] = {
+        dpi: ap,
+        points: strict.length,          // 本来の帯で使える点
+        fallback: loose.length,         // 実行時のフォールバック込み
+        selectable: sel.length,         // 外周1/8を除いて、実際に選ばれうる点
+        spread: spreadArea(sel),        // 点の散らばり（凸包の面積）
+        verdict: verdict(strict.length)
+      };
     });
     return r;
   }
@@ -513,10 +614,13 @@
     TS: TS, TN: TN, LEVELS: LEVELS,
     REGION_PORTRAIT: REGION_PORTRAIT, REGION_LANDSCAPE: REGION_LANDSCAPE,
     GOOD: GOOD, POOR: POOR,
+    TRACK_MIN: TRACK_MIN, TRACK_PER_FRAME: TRACK_PER_FRAME, EDGE_MARGIN: EDGE_MARGIN,
     toBW: toBW, dpiLevels: dpiLevels, scaleImage: scaleImage, bandRanges: bandRanges,
     featureMap: featureMap, selectFeatures: selectFeatures, predict: predict,
     evaluate: evaluate, apparentDpi: apparentDpi, usablePoints: usablePoints,
-    verdict: verdict, bandForDpi: bandForDpi
+    verdict: verdict, bandForDpi: bandForDpi,
+    convexHull: convexHull, spreadArea: spreadArea, pointsAt: pointsAt,
+    selectable: selectable
   };
 
   if (typeof module === 'object' && module.exports) module.exports = Engine;

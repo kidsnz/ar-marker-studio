@@ -28,9 +28,16 @@
     'res.summary': 'Source {w}×{h} / -dpi={dpi} / -level={level} → printed {mw}×{mh} mm'
       + '  /  {total} tracking points in total',
     'res.usedBy': 'used when held {who}',
-    'verdict.good': 'stable',
-    'verdict.mid': 'marginal',
-    'verdict.bad': 'unusable',
+    'verdict.stable': 'stable',
+    'verdict.marginal': 'marginal',
+    'verdict.limit': 'on the edge',
+    'verdict.cannot': 'cannot track',
+    'res.detail': '{sel} of them can actually be picked / spread {spread}% / {fb} with the runtime fallback',
+    'res.floor': 'Tracking stops below {n} points, so one lost point ends it.',
+    'res.cap': 'Only {n} points are tried per frame, so more than that buys little. Spread matters more than count.',
+    'res.spreadNote': 'Spread is the area the points enclose, as a share of the marker. '
+      + 'The tracker picks its first four points to maximise exactly this. '
+      + 'Measured on real devices: 1% jumps around, 17% mostly stable, 33% stable.',
     'res.basis': 'ARnft processes the camera image at a fixed 320×240 (hardcoded in '
       + 'ARnft.js prepareImage). Held upright the video is letterboxed, leaving 180×240 '
       + 'effective. apparent dpi = min(effective width px ÷ marker width in inches, '
@@ -197,10 +204,7 @@
     return n >= Engine.GOOD ? 'v-good' : (n >= Engine.POOR ? 'v-mid' : 'v-bad');
   }
 
-  function vText(n) {
-    return t(n >= Engine.GOOD ? 'verdict.good'
-           : (n >= Engine.POOR ? 'verdict.mid' : 'verdict.bad'));
-  }
+  function vText(n) { return t('verdict.' + Engine.verdict(n)); }
 
   function showResult() {
     var r = state.result;
@@ -213,7 +217,8 @@
         mw: ev.widthMm.toFixed(0), mh: ev.heightMm.toFixed(0), total: ev.total
       }) + '</p>'
       + verdictRow('res.portrait', Engine.REGION_PORTRAIT[0], ev.portrait)
-      + verdictRow('res.landscape', Engine.REGION_LANDSCAPE[0], ev.landscape);
+      + verdictRow('res.landscape', Engine.REGION_LANDSCAPE[0], ev.landscape)
+      + '<p class="hint">' + t('res.spreadNote') + '</p>';
 
     var max = Math.max.apply(null, r.bands.map(function (b) { return b.points.length; })) || 1;
     var tb = $('bands').querySelector('tbody');
@@ -250,12 +255,22 @@
   }
 
   function verdictRow(labelKey, px, d) {
+    var note = '';
+    if (d.points < Engine.POOR) {
+      note = '<div class="note v-bad">' + t('res.floor', { n: Engine.TRACK_MIN }) + '</div>';
+    } else if (d.points > Engine.TRACK_PER_FRAME) {
+      note = '<div class="note">' + t('res.cap', { n: Engine.TRACK_PER_FRAME }) + '</div>';
+    }
     return '<div class="verdict">'
       + '<span>' + t(labelKey, { px: px }) + '</span>'
       + '<span class="hint">' + t('res.apparent', { n: d.dpi.toFixed(1) }) + '</span>'
       + '<span class="n ' + vClass(d.points) + '">' + d.points + '</span>'
       + '<span class="' + vClass(d.points) + '">' + t('res.points') + '</span>'
-      + '<span class="' + vClass(d.points) + '">' + vText(d.points) + '</span></div>';
+      + '<span class="' + vClass(d.points) + '">' + vText(d.points) + '</span></div>'
+      + '<div class="subrow">' + t('res.detail', {
+          sel: d.selectable, spread: (d.spread * 100).toFixed(1), fb: d.fallback
+        }) + '</div>'
+      + note;
   }
 
   function drawHeatmap() {

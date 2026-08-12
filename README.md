@@ -28,6 +28,43 @@ No server. Your images never leave the browser.
 | **Generates** | Runs the real generator in-browser and gives you `.fset` / `.fset3` / `.iset` |
 | **Checks itself** | After generating, it compares the prediction against the real output |
 
+## What the runtime actually does (and why the numbers are what they are)
+
+The thresholds below are not folklore. They come from reading `tracking.c` and
+`selectTemplate.c` in ARToolKit5, which is where "how many points do I need" is really decided.
+
+| Fact | Source | What it means |
+|---|---|---|
+| **Tracking stops below 3 points** | `tracking.c`: `if(num < 3) return -3` | At exactly 3, one lost point ends it |
+| **Only 10 points are tried per frame** | `AR2_DEFAULT_SEARCH_FEATURE_NUM = 10` | 90 points still means 10 per frame. **Spread beats count** |
+| **Points in the outer 1/8 of the frame are never picked** | coordinate check in `ar2SelectTemplate` | Only bites when the band image is wider than ~176px |
+| **If a band is empty it retries `[mindpi/2, maxdpi*2]`** | `extractVisibleFeatures` | The strict band count is a little pessimistic |
+| **The band is chosen by the smaller of the two apparent dpi** | `ar2GetResolution2` puts the smaller in `dpi[1]`, and `w[1]` is what is tested | Confirms `min(width-based, height-based)` |
+
+### Spread
+
+`ar2SelectTemplate` picks the first four tracking points like this:
+
+| Point | Chosen as |
+|---|---|
+| 1st | **farthest from the centre** of the frame |
+| 2nd | **farthest from the 1st** |
+| 3rd | **farthest from the line** through the 1st and 2nd |
+| 4th | the one that **maximises the quadrilateral area** |
+| 5th on | whatever was tracked last frame, otherwise random |
+
+**Distribution is not a heuristic here, it is the algorithm.** The same number of points
+bunched together only spans a small quadrilateral, and the pose wobbles.
+
+The tool reports this as **spread**: the convex hull of the points as a share of the marker.
+Measured against real devices:
+
+| Spread | Points | Behaviour |
+|---|---|---|
+| 1% | 3 | jumps around |
+| 17% | 9 | mostly stable |
+| 33% | 14 | stable |
+
 ## Why the total point count is meaningless
 
 A `.fset` splits its points across distance bands (scales). At runtime only the band matching

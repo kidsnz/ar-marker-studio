@@ -68,9 +68,16 @@
     'res.points': '点',
     'res.summary': '元画像 {w}×{h} / -dpi={dpi} / -level={level} → 実寸 {mw}×{mh} mm　　追従点の合計 {total} 点',
     'res.usedBy': '{who}で使う',
-    'verdict.good': '安定',
-    'verdict.mid': '不足ぎみ',
-    'verdict.bad': '暴れる',
+    'verdict.stable': '安定',
+    'verdict.marginal': '不足ぎみ',
+    'verdict.limit': 'ギリギリ',
+    'verdict.cannot': '追従不可',
+    'res.detail': 'うち実際に選ばれうる {sel} 点 ／ 散らばり {spread}% ／ フォールバック込み {fb} 点',
+    'res.floor': '{n}点を切ると追従が止まる。1点失った時点で終わる。',
+    'res.cap': '1フレームで試されるのは{n}点まで。これ以上増やしても効きは薄い。数より散らばり。',
+    'res.spreadNote': '散らばりは、点が囲む面積がマーカー全体の何割かを表す。'
+      + '追従は最初の4点をまさにこれが最大になるように選ぶ。'
+      + '実機での実測: 1%=大小に飛ぶ ／ 17%=ほぼ安定 ／ 33%=安定。',
     'res.basis': 'ARnft が画像処理する解像度は 320×240 固定（ARnft.js の prepareImage）。'
       + '縦持ちでは映像が左右に黒帯で letterbox され実効 180×240 になる。'
       + '見かけdpi = min(実効幅px ÷ マーカー幅インチ, 240 ÷ マーカー高さインチ)。',
@@ -85,7 +92,8 @@
     'hm.opt': '{i}: {dpi} dpi（{w}×{h}、{n}点）',
     'hm.note': '有効範囲 {min}〜{max} dpi ／ 候補 {cand} 画素、うち条件を満たすもの {usable} 画素 ／ 選ばれた点 {n}（上限 {max2}）',
     'hm.p1.title': '選ばれた追従点',
-    'hm.p1.sub': '丸は占有半径。この中には他の点が入れない',
+    'hm.p1.sub': '丸は占有半径で、この中には他の点が入れない。'
+      + '灰色に落とした外周1/8は、実行時が絶対に点を選ばない帯',
     'hm.p2.title': '候補の強さ',
     'hm.p2.sub': '青＝紛らわしくない（良い）　赤＝紛らわしい',
     'hm.p3.title': '弱い領域',

@@ -108,6 +108,13 @@ button[disabled] { opacity: 0.45; cursor: default; }
 /* --- 判定 --- */
 .verdict { display: flex; gap: 1rem; align-items: baseline; padding: 0.35rem 0; flex-wrap: wrap; }
 .verdict .n { font-size: 1.6rem; font-weight: bold; }
+.subrow { color: var(--muted); font-size: 0.86em; padding-left: 1.2rem; }
+.subrow::before { content: "└ "; }
+.note {
+  font-size: 0.86em; padding: 0.25rem 0 0.25rem 1.2rem;
+  border-left: 2px solid var(--line); margin: 0.35rem 0 0.6rem 1.2rem;
+}
+.note.v-bad { border-left-color: var(--bad); }
 .v-good { color: var(--good); }
 .v-mid { color: var(--warn); }
 .v-bad { color: var(--bad); }
