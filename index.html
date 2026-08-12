@@ -1,139 +1,158 @@
 <!doctype html>
-<html lang="ja">
+<html lang="en">
 <head>
 <meta charset="utf-8">
 <meta name="viewport" content="width=device-width, initial-scale=1">
-<title>AR Marker Studio — 生成せずに品質が分かる NFT マーカー作成ツール</title>
-<meta name="description" content="ARToolKit5 の NFT マーカーを、生成する前に品質判定できるツール。追従点の数を距離帯ごとに予測し、絵のどこが弱いのかをヒートマップで示す。生成もブラウザ内で完結する。">
+<title>AR Marker Studio: know your NFT marker's quality before you build it</title>
+<meta name="description" content="Check the quality of an ARToolKit5 / ARnft NFT marker before generating it. Predicts the number of tracking points per distance band and shows where the artwork is weak. Generation runs in the browser too.">
 <link rel="stylesheet" href="css/style.css">
 </head>
 <body>
 
 <header>
+  <p class="langbar">
+    <label for="lang" data-i18n="lang.label">Language</label>
+    <select id="lang">
+      <option value="en">English</option>
+      <option value="ja">日本語</option>
+    </select>
+  </p>
   <h1>AR MARKER STUDIO</h1>
-  <p class="lead">NFT マーカーを<strong>作る前に</strong>品質が分かる。<br>
-     追従点の数を距離帯ごとに予測し、絵のどこが弱いのかを示す。生成もこのページで終わる。</p>
+  <p class="lead">
+    <span data-i18n="head.lead1">Know your NFT marker's quality <strong>before</strong> you build it.</span><br>
+    <span data-i18n="head.lead2">It predicts the number of tracking points per distance band and shows where the artwork is weak. Generation finishes on this page too.</span>
+  </p>
 </header>
 
 <main>
 
-<!-- ============ 1. 画像 ============ -->
+<!-- ============ 1. Image ============ -->
 <section id="step-image">
-  <h2>1. 元画像</h2>
-  <div id="drop" tabindex="0" role="button" aria-label="画像を選ぶ">
-    <p><strong>画像をドロップ</strong>、またはクリックして選ぶ</p>
-    <p class="hint">PNG 推奨。JPEG も読めるが、生成器と数値がわずかに食い違う</p>
+  <h2 data-i18n="step1.title">1. Source image</h2>
+  <div id="drop" tabindex="0" role="button" aria-label="Choose an image">
+    <p data-i18n="drop.main"><strong>Drop an image here</strong>, or click to choose one</p>
+    <p class="hint" data-i18n="drop.hint">PNG recommended. JPEG works, but its pixel values differ slightly from the generator's.</p>
     <input type="file" id="file" accept="image/png,image/jpeg" hidden>
   </div>
   <div id="imginfo" hidden>
     <canvas id="preview"></canvas>
     <dl id="imgmeta"></dl>
   </div>
-  <p id="alpha-warn" class="warn" hidden>
-    <strong>この画像にはアルファチャンネルがある。</strong>
-    NFT-Marker-Creator は RGBA の PNG を壊す（画像が横に繰り返され階調も反転した別物になる）。
-    生成する前に背景を白などで塗り潰して RGB にすること。
+  <p id="alpha-warn" class="warn" hidden data-i18n="alpha.warn">
+    <strong>This image has an alpha channel.</strong>
+    NFT-Marker-Creator corrupts RGBA PNGs: the picture ends up repeated sideways with its
+    tones inverted. Flatten the background to white (or any solid colour) and save as RGB
+    before generating.
   </p>
 </section>
 
-<!-- ============ 2. 設定 ============ -->
+<!-- ============ 2. Settings ============ -->
 <section id="step-config" hidden>
-  <h2>2. 設定</h2>
+  <h2 data-i18n="step2.title">2. Settings</h2>
   <div class="grid">
-    <label>マーカーの実寸幅
-      <span class="sub">印刷したときの横幅。ここから dpi が決まる</span>
+    <label><span data-i18n="cfg.width">Printed width</span>
+      <span class="sub" data-i18n="cfg.width.sub">How wide the marker is when printed. This decides the dpi.</span>
       <span class="row"><input type="number" id="size-mm" min="1" step="1" value="305"> mm</span>
     </label>
     <label>-dpi
-      <span class="sub">画像幅px ÷ 実寸インチ。実寸を変えると自動で入る</span>
+      <span class="sub" data-i18n="cfg.dpi.sub">Image width in px ÷ printed width in inches. Filled in automatically.</span>
       <input type="number" id="dpi" min="1" step="0.01">
     </label>
     <label>-level
-      <span class="sub">追従点の密度。既定は2だが、基本は4にする</span>
+      <span class="sub" data-i18n="cfg.level.sub">Density of tracking points. The generator defaults to 2, but use 4.</span>
       <select id="level">
-        <option value="0">0 — 最も厳しい</option>
+        <option value="0" data-i18n="cfg.level0">0 (strictest)</option>
         <option value="1">1</option>
-        <option value="2">2 — 生成器の既定</option>
+        <option value="2" data-i18n="cfg.level2">2 (generator default)</option>
         <option value="3">3</option>
-        <option value="4" selected>4 — 最も点が採れる（推奨）</option>
+        <option value="4" selected data-i18n="cfg.level4">4 (most points, recommended)</option>
       </select>
     </label>
     <label>-leveli
-      <span class="sub">検出側（.fset3）の密度。追従の安定性には効かない</span>
+      <span class="sub" data-i18n="cfg.leveli.sub">Density on the detection side (.fset3). Does not affect tracking stability.</span>
       <select id="leveli">
         <option value="0">0</option>
-        <option value="1" selected>1 — 既定</option>
+        <option value="1" selected data-i18n="cfg.leveli1">1 (default)</option>
         <option value="2">2</option>
         <option value="3">3</option>
       </select>
     </label>
   </div>
-  <p class="preset">よくある実寸:
-    <button type="button" class="mm" data-mm="305">12インチ 305mm</button>
-    <button type="button" class="mm" data-mm="180">7インチ 180mm</button>
-    <button type="button" class="mm" data-mm="297">A4横 297mm</button>
-    <button type="button" class="mm" data-mm="210">A4縦 210mm</button>
-    <button type="button" class="mm" data-mm="100">ポストカード 100mm</button>
+  <p class="preset"><span data-i18n="cfg.presets">Common sizes:</span>
+    <button type="button" class="mm" data-mm="305" data-i18n="cfg.p305">12" record 305mm</button>
+    <button type="button" class="mm" data-mm="180" data-i18n="cfg.p180">7" record 180mm</button>
+    <button type="button" class="mm" data-mm="297" data-i18n="cfg.p297">A4 landscape 297mm</button>
+    <button type="button" class="mm" data-mm="210" data-i18n="cfg.p210">A4 portrait 210mm</button>
+    <button type="button" class="mm" data-mm="100" data-i18n="cfg.p100">Postcard 100mm</button>
   </p>
-  <p><button type="button" id="run" class="primary">品質を判定する</button>
+  <p><button type="button" id="run" class="primary" data-i18n="btn.run">Check quality</button>
      <span id="progress" class="hint"></span></p>
 </section>
 
-<!-- ============ 3. 判定 ============ -->
+<!-- ============ 3. Verdict ============ -->
 <section id="step-result" hidden>
-  <h2>3. 判定</h2>
+  <h2 data-i18n="step3.title">3. Verdict</h2>
   <div id="verdicts"></div>
   <table id="bands">
-    <caption>距離帯ごとの追従点。<strong>合計は当てにならない。実際に使う帯の点数だけを見る</strong></caption>
-    <thead><tr><th>#</th><th>有効範囲 (dpi)</th><th>画素数</th><th>点</th><th></th></tr></thead>
+    <caption data-i18n="tbl.caption">Tracking points per distance band.
+      <strong>The total is meaningless. Only the band you actually use matters.</strong></caption>
+    <thead><tr>
+      <th>#</th>
+      <th data-i18n="tbl.range">Valid range (dpi)</th>
+      <th data-i18n="tbl.px">Pixels</th>
+      <th data-i18n="tbl.pts">Points</th>
+      <th></th>
+    </tr></thead>
     <tbody></tbody>
   </table>
   <p class="hint" id="basis"></p>
 </section>
 
-<!-- ============ 4. ヒートマップ ============ -->
+<!-- ============ 4. Heatmap ============ -->
 <section id="step-heatmap" hidden>
-  <h2>4. 絵のどこが弱いか</h2>
+  <h2 data-i18n="step4.title">4. Where the artwork is weak</h2>
   <p class="row">
-    <label for="band">見る距離帯</label>
+    <label for="band" data-i18n="hm.band">Distance band</label>
     <select id="band"></select>
     <span id="band-note" class="hint"></span>
   </p>
   <div class="panels">
     <figure><canvas id="hm0"></canvas>
-      <figcaption><b>選ばれた追従点</b><br>丸は占有半径。この中には他の点が入れない</figcaption></figure>
+      <figcaption><b data-i18n="hm.p1.title">Selected tracking points</b><br>
+        <span data-i18n="hm.p1.sub">Circles are the occupancy radius. No other point may sit inside one.</span></figcaption></figure>
     <figure><canvas id="hm1"></canvas>
-      <figcaption><b>候補の強さ</b><br>
-        <span class="scale"><i class="s-good"></i>青＝紛らわしくない（良い）　<i class="s-bad"></i>赤＝紛らわしい</span></figcaption></figure>
+      <figcaption><b data-i18n="hm.p2.title">Candidate strength</b><br>
+        <span class="scale"><i class="s-good"></i><span data-i18n="hm.p2.sub">blue = distinct from its surroundings (good)　red = easily confused</span></span></figcaption></figure>
     <figure><canvas id="hm2"></canvas>
-      <figcaption><b>弱い領域</b><br>
-        <span class="scale"><i class="s-good"></i>青＝手がかりが近い　<i class="s-bad"></i>赤＝手がかりが無い</span><br>
-        外周22pxはテンプレートが収まらず構造的に対象外（灰色）</figcaption></figure>
+      <figcaption><b data-i18n="hm.p3.title">Weak areas</b><br>
+        <span class="scale"><i class="s-good"></i><span data-i18n="hm.p3.sub">blue = a usable clue is nearby　red = no clue at all</span></span><br>
+        <span data-i18n="hm.p3.sub2">The outer 22px is structurally excluded, because the template does not fit there (shown grey).</span></figcaption></figure>
   </div>
   <details>
-    <summary>点を増やすには（すべて実測で確認した手）</summary>
+    <summary data-i18n="tips.summary">How to get more points (everything below is measured, not guessed)</summary>
     <ul>
-      <li><b>ニアレストネイバーで2倍に拡大する</b> — 最も効く。補間拡大は逆効果</li>
-      <li><b>-level=4 にする</b> — 既定の2から上げるだけで倍近くになる</li>
-      <li><b>絵を粗くする</b> — 大きな塊を離して複数置く。塊1個で数点増える</li>
-      <li><b>四辺すべてに構造を置く</b> — 上下だけでは横方向の位置が決まらない</li>
-      <li><b>正方形か4:3にする</b> — 横長は縦持ちで不利</li>
-      <li><b>グレーの階調を残す</b> — 白黒2値化は大幅に悪化する</li>
+      <li data-i18n="tips.1"><b>Scale up 2× with nearest-neighbour.</b> By far the most effective. Interpolated scaling backfires.</li>
+      <li data-i18n="tips.2"><b>Use -level=4.</b> Going from the default 2 almost doubles the count.</li>
+      <li data-i18n="tips.3"><b>Make the artwork coarser.</b> Place large blocks apart from each other.</li>
+      <li data-i18n="tips.4"><b>Put structure on all four edges.</b> Top and bottom alone cannot fix horizontal position.</li>
+      <li data-i18n="tips.5"><b>Go square or 4:3.</b> Wide formats lose badly when the phone is held upright.</li>
+      <li data-i18n="tips.6"><b>Keep the greys.</b> Converting to pure black and white makes it far worse.</li>
     </ul>
-    <p>効かないと分かっているもの: 細線・ディザ・二重線・破線、細い枠（縮小後3px未満）、
-       <code>-dpi</code> の変更（距離帯が動くだけ）、4倍拡大（2倍より悪い）。</p>
+    <p data-i18n="tips.no">Confirmed not to help: thin lines, dithering, double or dashed lines,
+      thin borders (under 3px after downscaling), changing <code>-dpi</code>
+      (it only shifts the distance bands), and 4× scaling (worse than 2×).</p>
   </details>
 </section>
 
-<!-- ============ 5. 生成 ============ -->
+<!-- ============ 5. Generate ============ -->
 <section id="step-generate" hidden>
-  <h2>5. マーカーを生成する</h2>
-  <p class="hint">本物の生成器（ARToolKit5 の genTexData）をこのページの中で動かす。
-     サーバーには何も送らない。</p>
+  <h2 data-i18n="step5.title">5. Generate the marker</h2>
+  <p class="hint" data-i18n="gen.hint">The real generator (ARToolKit5's genTexData) runs inside this page.
+     Nothing is sent to a server.</p>
   <p class="row">
-    <label for="name">ファイル名</label>
+    <label for="name" data-i18n="gen.name">File name</label>
     <input type="text" id="name" value="marker" size="16">
-    <button type="button" id="gen" class="primary">生成してダウンロード</button>
+    <button type="button" id="gen" class="primary" data-i18n="btn.gen">Generate &amp; download</button>
     <span id="genstat" class="hint"></span>
   </p>
   <div id="genresult" hidden>
@@ -146,12 +165,15 @@
 </main>
 
 <footer>
-  <p>生成部分は <a href="https://github.com/Carnaux/NFT-Marker-Creator">Carnaux/NFT-Marker-Creator</a>（MIT）の成果物をそのまま使っている。
-     判定・ヒートマップは実際の生成器のログと突き合わせて検証した独自実装。</p>
-  <p><a href="test/verify.html">検算ページ</a>
-     <a href="https://github.com/kidsnz/ar-marker-studio">ソース</a></p>
+  <p data-i18n="foot.credit">The generator is the unmodified build from
+     <a href="https://github.com/Carnaux/NFT-Marker-Creator">Carnaux/NFT-Marker-Creator</a> (MIT).
+     The quality check and the heatmaps are an independent implementation, verified against
+     the real generator's own logs.</p>
+  <p><a href="test/verify.html" data-i18n="foot.verify">Verification page</a>
+     <a href="https://github.com/kidsnz/ar-marker-studio" data-i18n="foot.source">Source</a></p>
 </footer>
 
+<script src="js/i18n.js"></script>
 <script src="js/png.js"></script>
 <script src="js/engine.js"></script>
 <script src="js/heatmap.js"></script>

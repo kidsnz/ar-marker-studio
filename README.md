@@ -1,175 +1,198 @@
 # AR Marker Studio
 
-**NFT マーカーを作る前に品質が分かる。** ARToolKit5 / ARnft 用のマーカー作成ツール。
+**Know your NFT marker's quality before you build it.** A marker authoring tool for
+ARToolKit5 / ARnft.
 
 → **https://kidsnz.github.io/ar-marker-studio/**
 
-既存の [NFT-Marker-Creator](https://github.com/Carnaux/NFT-Marker-Creator) は
-「生成はできるが、できたマーカーが良いか悪いか分からない」。
-実機に持っていって初めて姿勢が暴れると気づき、絵を直してまた生成する、を繰り返すことになる。
-このツールは**生成する前に**追従点の数を予測し、絵のどこが弱いのかを示す。生成も同じページで終わる。
+[日本語版 README](README.ja.md)
 
-サーバーは無い。画像はブラウザの外に出ない。
+The existing [NFT-Marker-Creator](https://github.com/Carnaux/NFT-Marker-Creator) will happily
+generate a marker, but it tells you nothing about whether that marker is any good. You find out
+on the phone, when the pose jitters. Then you edit the artwork, generate again, and repeat.
+
+This tool predicts the number of tracking points **before** you generate, and shows you which
+part of the artwork is letting you down. Generation happens on the same page.
+
+No server. Your images never leave the browser.
 
 ---
 
-## できること
+## What it does
 
 | | |
 |---|---|
-| **生成前の予測** | 距離帯ごとの追従点の数を、生成せずに数秒で出す |
-| **実使用での判定** | 「縦持ちで何点使えるか」を出す。**合計点数は当てにならない** |
-| **ヒートマップ** | 選ばれた点／候補の強さ／**手がかりが無い領域**を3面で表示 |
-| **生成** | 本物の生成器をブラウザ内で走らせて `.fset` / `.fset3` / `.iset` を作る |
-| **自己検証** | 生成したら、予測と実際が一致したかをその場で照合して表示する |
+| **Predicts before generating** | Tracking points per distance band, in a few seconds |
+| **Judges real-world use** | "How many points do I actually get holding the phone upright?" |
+| **Heatmaps** | Selected points / candidate strength / **areas with no clue at all** |
+| **Generates** | Runs the real generator in-browser and gives you `.fset` / `.fset3` / `.iset` |
+| **Checks itself** | After generating, it compares the prediction against the real output |
 
-## なぜ「合計点数」を見てはいけないのか
+## Why the total point count is meaningless
 
-`.fset` は距離帯（scale）ごとに点を分けて持っていて、実行時はカメラから見た
-**見かけの解像度**に対応する帯の点だけが使われる。合計92点でも、実際に使う帯には
-14点しか無いことがある。
+A `.fset` splits its points across distance bands (scales). At runtime only the band matching
+the **apparent resolution** of the marker in the camera is used. A marker with 92 points in
+total can have just 14 in the band you actually use.
 
-そして **ARnft が画像処理する解像度は 320×240 で固定**（`ARnft.js` の `prepareImage()` に
-ハードコードされている）。さらにスマホを**縦持ちすると映像が左右に黒帯で letterbox され、
-実効 180×240 になる**。「カメラは640pxだから大丈夫」は誤りで、この前提を取り違えると
-判定が3.5倍ずれる。
+And **ARnft processes the camera image at a fixed 320×240** (hardcoded in `prepareImage()` in
+`ARnft.js`). Hold the phone upright and the video is letterboxed, leaving **180×240 effective**.
+"My camera is 640px so I'm fine" is wrong, and getting this backwards throws the verdict off by
+a factor of 3.5.
 
 ```
-見かけdpi = min( 実効幅px ÷ マーカー幅インチ, 240 ÷ マーカー高さインチ )
-   実効幅px = 横持ち 320 / 縦持ち 180
+apparent dpi = min( effective width px ÷ marker width in inches,
+                    240 ÷ marker height in inches )
+   effective width px = 320 held sideways / 180 held upright
 ```
 
-実機で確認した目安（縦持ち）:
+Measured against real devices, holding the phone upright:
 
-| 使える点 | 実機での体感 |
+| Usable points | How it behaves |
 |---|---|
-| 14点 | 安定 |
-| 9点 | ほぼ安定（わずかに症状） |
-| 3点 | 大小に飛んで使えない |
+| 14 | stable |
+| 9 | mostly stable, slight jitter |
+| 3 | jumps around, unusable |
 
-## 点が足りないときに効く手（すべて実測）
+## What actually increases the point count
 
-- **ニアレストネイバーで2倍に拡大する** — 最も効く。補間拡大はエッジが鈍って逆効果
-- **`-level=4` にする** — 既定は2。上げるだけで倍近くになる
-- **絵を粗くする** — 大きな塊を離して複数置く
-- **四辺すべてに構造を置く** — 上下だけでは横方向の位置が決まらない
-- **正方形か4:3にする** — 横長は縦持ちで不利
-- **グレーの階調を残す** — 白黒2値化は大幅に悪化する（9点 → 2点）
+All of the following was measured, not guessed.
 
-効かないと確認済み: 細線・ディザ・二重線・破線、細い枠（縮小後3px未満）、
-`-dpi` の変更（距離帯が動くだけで点数は変わらない）、4倍拡大（2倍より悪い）。
+- **Scale up 2× with nearest-neighbour.** By far the most effective. Interpolated scaling
+  softens the edges and backfires.
+- **Use `-level=4`.** The generator defaults to 2. Just raising it nearly doubles the count.
+- **Make the artwork coarser.** Place large blocks apart from each other.
+- **Put structure on all four edges.** Top and bottom alone cannot fix horizontal position.
+- **Go square or 4:3.** Wide formats lose badly when the phone is held upright.
+- **Keep the greys.** Converting to pure black and white made one marker drop from 9 points to 2.
 
-## 【重要】アルファ付き PNG を入れてはいけない
+Confirmed not to help: thin lines, dithering, double or dashed lines, thin borders (under 3px
+after downscaling), changing `-dpi` (it only shifts the bands), and 4× scaling (worse than 2×).
 
-NFT-Marker-Creator の `rgbaToRgb()` は壊れている。アルファ値を 0〜1 として扱うべきところを
-0〜255 のまま計算し、さらに3バイト/画素の配列を4バイト刻みで読み直すため、
-**画像が横に5回繰り返され階調も反転した別物**になる。生成前に背景を塗り潰して RGB にすること。
-このツールはアルファを検出したら警告を出す。
+## Important: never feed it a PNG with an alpha channel
+
+`rgbaToRgb()` in NFT-Marker-Creator is broken. It treats alpha as 0–1 while the values are
+actually 0–255, then re-reads the resulting 3-bytes-per-pixel array in 4-byte steps. The result
+is **the picture repeated about five times sideways with its tones inverted**. Flatten the
+background to a solid colour and save as RGB before generating. This tool warns you when it
+sees an alpha channel.
 
 ---
 
-## 精度
+## Accuracy
 
-判定部分は ARToolKit5 の `ar2GenImageSet` / `ar2GenFeatureMap` / `ar2SelectFeature2` を
-再現した独自実装。**推測ではなく、本物の生成器を走らせたログと全点・全距離帯で
-突き合わせて検証してある。**
+The quality check is an independent reimplementation of ARToolKit5's `ar2GenImageSet`,
+`ar2GenFeatureMap` and `ar2SelectFeature2`. **It was not guessed at: it was checked against the
+real generator's own logs, point by point, band by band.**
 
-12通り（画像9枚 × level 0〜4 × dpi 40〜150）の結果:
+Across 12 configurations (9 images × levels 0–4 × dpi 40–150):
 
-| 一致の度合い | 件数 |
+| Agreement | Cases |
 |---|---|
-| 座標・点数・候補数まで1点残らず一致 | 7 |
-| 点数・候補数は一致、値差 5e-6 の同着で座標が数点入れ替わる | 3 |
-| 数％ずれる（のっぺりしたグラデの絵） | 2 |
+| Every coordinate, count and candidate identical | 7 |
+| Counts identical; a few coordinates swapped between ties 5e-6 apart | 3 |
+| Off by a few percent (flat, gradient-heavy artwork) | 2 |
 
-ずれる原因はすべて**生成器側の丸め誤差**。生成器は相関を float32 で 2025 画素ぶん
-足し込むため、輝度SDが小さい領域で桁落ちして値が 1e-3 ほど動く。
-float32 の逐次加算で追試して生成器のログの値を小数点以下6桁まで再現できたので、
-このツールの float64 の方が数学的には正しい。判定が変わるほどの差ではない。
+Every remaining difference comes from **rounding inside the generator itself**. It accumulates
+correlation over 2025 pixels in float32, so in low-contrast regions the sum loses precision and
+values drift by about 1e-3. Reproducing that float32 accumulation step by step matched the
+generator's logged values to six decimal places, which means this tool's float64 result is the
+mathematically correct one. The difference is never large enough to change the verdict.
 
-### 検算
+### Verification
 
-エンジンを直したら**必ず**検算を通すこと。「直したつもり」は当てにならない
-（この検算は実際に誤りを検出している）。
+**Always run the verification after touching the engine.** "I'm pretty sure that's right" is not
+good enough. This check has already caught real mistakes.
 
-期待値は `test/fixtures.js`。マーカーの元画像は
-murakamishinji.com のリポジトリの `projects/atariar/markers/` にあるもの
-（このリポジトリと並べて置いている場合は下のパスでそのまま通る）。
+Expected values live in `test/fixtures.js`. The marker source images come from
+`projects/atariar/markers/` in the murakamishinji.com repository.
 
 ```bash
-# Node で
+# Node
 node test/verify.js ../website/projects/atariar/markers
 
-# ブラウザで（開いたら test/verify.html でフォルダを選ぶ）
+# Browser: serve, then open test/verify.html and pick the folder
 python3 -m http.server 8000
 ```
 
-判定エンジンには Python 版（`website/tools/predict_features.py`）もあり、
-同じ期待値で `--self-test` が通る。**この2つは互いの答え合わせになっている。**
+There is also a Python implementation of the same engine
+(`website/tools/predict_features.py`) that passes the same fixtures. **The two check each
+other.**
 
 ---
 
-## アルゴリズム（移植するときの要点）
+## The algorithm, for anyone porting it
 
-**相関は全画素で測られてはいない。** ここを見落とすと予測が5倍に膨らむ。
+**Correlation is not measured at every pixel.** Miss this and your prediction comes out about
+five times too high.
 
-1. **候補を絞る** — 3×3 の勾配を取り、4近傍すべてより大きい画素だけを残す（`Extracted`）。
-   さらに 1000段のヒストグラムを強い順に積み、**画素数の2%**で足切りする（`Filtered`）。
-2. **相関を測る** — 残った候補について 45×45 のテンプレートを作り、
-   **半径2より外・±10以内**（21×21の正方形から半径2の円板をくり抜いたドーナツ）での
-   最大相関を記録する。0.95 を超えたら打ち切るので、記録値は真の最大とは限らない。
-3. **低い順に採る** — `max_thresh` 未満、輝度SDが `sd_thresh` 以上、
-   ±2px の相関の最大が **0.99 以下**（ハードコード、変更不可）の3条件を満たす点を、
-   値の小さい順に採る。採るたびに周囲 `occ_size×2` を塗り潰す。
+1. **Narrow down the candidates.** Take a 3×3 gradient and keep only pixels greater than all
+   four neighbours (`Extracted` in the log). Then build a 1000-bin histogram, walk down from the
+   strongest, and cut off at **2% of the pixel count** (`Filtered`).
+2. **Measure correlation.** For the survivors, build a 45×45 template and record the highest
+   correlation anywhere **outside radius 2 but within ±10** (a 21×21 square with a radius-2 disc
+   punched out). It stops early once anything exceeds 0.95, so the recorded value is not
+   necessarily the true maximum.
+3. **Take the lowest first.** A point qualifies if its value is below `max_thresh`, its
+   luminance SD is at least `sd_thresh`, and the highest correlation within ±2px is **0.99 or
+   lower** (hardcoded, not configurable). Each point taken paints out `occ_size × 2` around it.
 
-移植で最も嵌まるのは **float32**。ARToolKit は要所を float で計算していて、
-JavaScript の double のまま書くと値がずれる。特に最小dpiの計算:
+The thing that will bite you is **float32**. ARToolKit computes key steps in single precision,
+and writing them in JavaScript's doubles gives different answers. The minimum-dpi calculation in
+particular:
 
 ```c
-truncf( (28.0f / 短辺) * dpi * 1000.0 ) / 1000.0f
+truncf( (28.0f / shorter side) * dpi * 1000.0 ) / 1000.0f
 ```
 
-`* 1000.0` は double の定数なので途中まで double で進むが、`truncf` の引数は float なので
-**そこで丸め上がってから**切り捨てられる。520×400・dpi=60 だと 4199.9998 が 4200.0 に
-なって 4.2 になる。double のまま切り捨てると 4.199 になり、以降の距離帯が全部 0.02% ずれ、
-縮小画像の高さが1px変わって下流が全部合わなくなる。
+`* 1000.0` is a double constant, so the expression runs in double, but `truncf` takes a float,
+so the value is **rounded up on the way in** and only then truncated. At 520×400 with dpi=60,
+4199.9998 becomes 4200.0 and the result is 4.2. Truncate in double and you get 4.199, every
+distance band shifts by 0.02%, a downscaled image comes out one pixel shorter, and nothing
+downstream matches.
 
-`js/engine.js` は C が float で計算している箇所を `Math.fround()` で1段ずつ丸めている。
+`js/engine.js` rounds through `Math.fround()` at every step where the C code uses a float.
 
-## 構成
+## Layout
 
 ```
-index.html          画面
+index.html          the page
 css/style.css
-js/engine.js        判定エンジン（ブラウザ/Node 共用、依存なし）
-js/worker.js        予測を別スレッドで回す
-js/heatmap.js       ヒートマップの描画
-js/png.js           PNG デコーダ（canvas はカラープロファイルで画素値を変えるため自前で読む）
-js/generate.js      生成の呼び出し
-js/genworker.js     生成を別スレッドで回す（メインで回すとタブが固まる）
-js/app.js           画面まわり
-vendor/             NFT-Marker-Creator の成果物（asm.js 単一ファイル）
-test/               検算（fixtures.js / verify.js / verify.html）
+js/engine.js        the quality engine (browser + Node, no dependencies)
+js/i18n.js          language switching (English is the source, Japanese is a layer)
+js/worker.js        runs the prediction off the main thread
+js/heatmap.js       heatmap rendering
+js/png.js           PNG decoder (canvas can alter pixels via colour profiles, so we decode here)
+js/generate.js      generator entry point
+js/genworker.js     runs generation off the main thread (it freezes the tab otherwise)
+js/app.js           page wiring
+vendor/             NFT-Marker-Creator build artifact (single asm.js file)
+test/               verification (fixtures.js / verify.js / verify.html)
 ```
 
-ビルドツールは使わない。素の HTML/CSS/JS で、`git push` すればそのまま公開される。
+No build tools. Plain HTML/CSS/JS: `git push` and it is live.
 
-## 速度の目安
+Source comments are in Japanese, since this started as a tool for one artist's own workflow.
+The UI and this README are in English.
 
-Chrome / M系 Mac、320×320 の画像で:
+## Speed
+
+Chrome on an Apple Silicon Mac, with a 320×320 image:
 
 | | |
 |---|---|
-| 予測（全距離帯・12帯） | 約3秒 |
-| 生成 | 約6秒 |
+| Prediction (all 12 bands) | about 3 seconds |
+| Generation | about 6 seconds |
 
-どちらも Worker で回すのでページは固まらない。
+Both run in a Worker, so the page stays responsive.
 
-## ライセンス
+## Licence
 
-MIT。`vendor/` は [Carnaux/NFT-Marker-Creator](https://github.com/Carnaux/NFT-Marker-Creator)（MIT）の
-成果物をそのまま同梱している。判定・ヒートマップ・画面は独自実装。
+MIT. `vendor/` bundles, unmodified, a build artifact from
+[Carnaux/NFT-Marker-Creator](https://github.com/Carnaux/NFT-Marker-Creator) (MIT), which is
+itself an Emscripten build of ARToolKit5 (LGPL v3 with a linking exception). See
+[LICENSE](LICENSE). The quality engine, heatmaps and interface are original work.
 
-元の生成ツールはこちら:
-- [Carnaux/NFT-Marker-Creator](https://github.com/Carnaux/NFT-Marker-Creator)（本家）
-- [kidsnz/NFT-Marker-Creator](https://github.com/kidsnz/NFT-Marker-Creator)（保全用のフォーク。本家と同一）
+Related:
+- [Carnaux/NFT-Marker-Creator](https://github.com/Carnaux/NFT-Marker-Creator) (upstream)
+- [kidsnz/NFT-Marker-Creator](https://github.com/kidsnz/NFT-Marker-Creator) (preservation fork,
+  identical to upstream)

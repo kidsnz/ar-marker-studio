@@ -8,6 +8,56 @@
   'use strict';
 
   var $ = function (id) { return document.getElementById(id); };
+
+  // 動的に組み立てる文字列の英語原本。日本語は js/i18n.js が持つ
+  self.I18N_EN = self.I18N_EN || {};
+  var EN = {
+    'meta.size': 'Pixels',
+    'meta.color': 'Colour',
+    'meta.format': 'Format',
+    'meta.gray': 'greyscale (r=g=b)',
+    'meta.rgb': 'colour → converted with (r+g+b)/3',
+    'meta.png': 'PNG (decoded here, so values match the generator exactly)',
+    'meta.jpeg': 'JPEG (decoded by canvas; values differ slightly from the generator)',
+    'res.portrait': 'Held upright ({px}px effective)',
+    'res.landscape': 'Held sideways ({px}px effective)',
+    'res.portrait.short': 'upright',
+    'res.landscape.short': 'sideways',
+    'res.apparent': 'apparent {n} dpi →',
+    'res.points': 'points',
+    'res.summary': 'Source {w}×{h} / -dpi={dpi} / -level={level} → printed {mw}×{mh} mm'
+      + '  /  {total} tracking points in total',
+    'res.usedBy': 'used when held {who}',
+    'verdict.good': 'stable',
+    'verdict.mid': 'marginal',
+    'verdict.bad': 'unusable',
+    'res.basis': 'ARnft processes the camera image at a fixed 320×240 (hardcoded in '
+      + 'ARnft.js prepareImage). Held upright the video is letterboxed, leaving 180×240 '
+      + 'effective. apparent dpi = min(effective width px ÷ marker width in inches, '
+      + '240 ÷ marker height in inches).',
+    'progress.band': 'Band {i}/{n} ({w}×{h}, {dpi}dpi)…',
+    'progress.prep': 'Preparing…',
+    'progress.final': 'Finishing…',
+    'tbl.rangeFmt': '{min} to {max}',
+    'hm.opt': '{i}: {dpi} dpi ({w}×{h}, {n} pts)',
+    'hm.note': 'Valid range {min} to {max} dpi / {cand} candidate pixels, {usable} of them usable'
+      + ' / {n} points selected (cap {max2})',
+    'gen.loading': 'Loading the generator… (about 1MB, first time only)',
+    'gen.running': 'Generating… {t}',
+    'gen.done': 'Done in {s}s. Keep all three files in the same folder.',
+    'gen.match': 'Prediction matched the real output across all {n} bands.',
+    'gen.mismatch': 'Prediction differed in {d} of {n} bands (actual: [{got}]). '
+      + 'On flat artwork the generator\'s own rounding can shift things by a few percent.',
+    'gen.actual': 'Actual .fset: [{got}]',
+    'err.image': 'Could not read the image: {m}',
+    'err.dpi': 'That dpi is not valid',
+    'err.calc': 'Calculation failed: {m}',
+    'err.gen': 'Generation failed: {m}'
+  };
+  Object.keys(EN).forEach(function (k) {
+    if (self.I18N_EN[k] == null) self.I18N_EN[k] = EN[k];
+  });
+  var t = function (k, v) { return I18N.t(k, v); };
   var state = { rgba: null, W: 0, H: 0, name: 'marker', isPNG: true, result: null };
 
   // ------------------------------------------------------------------
@@ -45,7 +95,7 @@
       state.isPNG = isPNG;
       showImage();
     }).catch(function (err) {
-      alert('画像を読めなかった: ' + err.message);
+      alert(t('err.image', { m: err.message }));
     });
   }
 
@@ -69,10 +119,9 @@
 
     var info = Engine.toBW(state.rgba, state.W, state.H);
     $('imgmeta').innerHTML =
-      row('画素数', state.W + ' × ' + state.H)
-      + row('色', info.nc === 1 ? 'グレースケール（r=g=b）' : 'カラー → (r+g+b)/3 で白黒化')
-      + row('形式', state.isPNG ? 'PNG（自前でデコード＝生成器と同じ値）'
-                                : 'JPEG（canvas でデコード。生成器と数値がわずかに違う）');
+      row(t('meta.size'), state.W + ' × ' + state.H)
+      + row(t('meta.color'), t(info.nc === 1 ? 'meta.gray' : 'meta.rgb'))
+      + row(t('meta.format'), t(state.isPNG ? 'meta.png' : 'meta.jpeg'));
     $('imginfo').hidden = false;
     $('alpha-warn').hidden = !info.hasAlpha;
 
@@ -111,10 +160,10 @@
   $('run').addEventListener('click', function () {
     if (!state.rgba) return;
     var dpi = parseFloat($('dpi').value), level = parseInt($('level').value, 10);
-    if (!(dpi > 0)) { alert('dpi が正しくない'); return; }
+    if (!(dpi > 0)) { alert(t('err.dpi')); return; }
 
     $('run').disabled = true;
-    $('progress').textContent = '準備中…';
+    $('progress').textContent = t('progress.prep');
 
     var bw = Engine.toBW(state.rgba, state.W, state.H).bw;
     if (worker) worker.terminate();
@@ -122,9 +171,9 @@
     worker.onmessage = function (e) {
       var m = e.data;
       if (m.type === 'progress') {
-        $('progress').textContent = m.i >= m.n ? 'まとめ中…'
-          : '距離帯 ' + (m.i + 1) + '/' + m.n + '（' + m.w + '×' + m.h + '、'
-            + m.dpi.toFixed(1) + 'dpi）を計算中…';
+        $('progress').textContent = m.i >= m.n ? t('progress.final')
+          : t('progress.band', { i: m.i + 1, n: m.n, w: m.w, h: m.h,
+                                 dpi: m.dpi.toFixed(1) });
       } else if (m.type === 'done') {
         $('progress').textContent = '';
         $('run').disabled = false;
@@ -133,7 +182,7 @@
       } else if (m.type === 'error') {
         $('progress').textContent = '';
         $('run').disabled = false;
-        alert('計算に失敗した: ' + m.message);
+        alert(t('err.calc', { m: m.message }));
       }
     };
     // bw はコピーせず所有権ごと渡す（元は使い終わっている）
@@ -148,44 +197,49 @@
     return n >= Engine.GOOD ? 'v-good' : (n >= Engine.POOR ? 'v-mid' : 'v-bad');
   }
 
+  function vText(n) {
+    return t(n >= Engine.GOOD ? 'verdict.good'
+           : (n >= Engine.POOR ? 'verdict.mid' : 'verdict.bad'));
+  }
+
   function showResult() {
     var r = state.result;
     var mm = parseFloat($('size-mm').value);
     var ev = Engine.evaluate(r, mm);
 
     $('verdicts').innerHTML =
-      '<p class="hint">元画像 ' + r.W + '×' + r.H + ' / -dpi=' + (+r.dpi.toFixed(2))
-        + ' / -level=' + r.level + ' → 実寸 '
-        + ev.widthMm.toFixed(0) + '×' + ev.heightMm.toFixed(0) + ' mm'
-        + '　　追従点の合計 ' + ev.total + ' 点</p>'
-      + verdictRow('縦持ち', '実効180px', ev.portrait)
-      + verdictRow('横持ち', '実効320px', ev.landscape);
+      '<p class="hint">' + t('res.summary', {
+        w: r.W, h: r.H, dpi: +r.dpi.toFixed(2), level: r.level,
+        mw: ev.widthMm.toFixed(0), mh: ev.heightMm.toFixed(0), total: ev.total
+      }) + '</p>'
+      + verdictRow('res.portrait', Engine.REGION_PORTRAIT[0], ev.portrait)
+      + verdictRow('res.landscape', Engine.REGION_LANDSCAPE[0], ev.landscape);
 
     var max = Math.max.apply(null, r.bands.map(function (b) { return b.points.length; })) || 1;
     var tb = $('bands').querySelector('tbody');
     tb.innerHTML = r.bands.map(function (b, i) {
       var used = [];
-      if (b.mindpi <= ev.portrait.dpi && ev.portrait.dpi <= b.maxdpi) used.push('縦持ち');
-      if (b.mindpi <= ev.landscape.dpi && ev.landscape.dpi <= b.maxdpi) used.push('横持ち');
+      if (b.mindpi <= ev.portrait.dpi && ev.portrait.dpi <= b.maxdpi) used.push(t('res.portrait.short'));
+      if (b.mindpi <= ev.landscape.dpi && ev.landscape.dpi <= b.maxdpi) used.push(t('res.landscape.short'));
       return '<tr class="' + (used.length ? 'used' : '') + '">'
         + '<td>' + i + '</td>'
-        + '<td>' + b.mindpi.toFixed(1) + ' 〜 ' + b.maxdpi.toFixed(1) + '</td>'
+        + '<td>' + t('tbl.rangeFmt', { min: b.mindpi.toFixed(1),
+                                        max: b.maxdpi.toFixed(1) }) + '</td>'
         + '<td>' + b.W + '×' + b.H + '</td>'
         + '<td>' + b.points.length + '</td>'
         + '<td><span class="bar" style="width:' + (b.points.length / max * 100) + '%"></span>'
-        + (used.length ? '<span class="tag">' + used.join('・') + 'で使う</span>' : '')
+        + (used.length ? '<span class="tag">'
+            + t('res.usedBy', { who: used.join(' / ') }) + '</span>' : '')
         + '</td></tr>';
     }).join('');
 
-    $('basis').textContent =
-      'ARnft が画像処理する解像度は 320×240 固定（ARnft.js の prepareImage）。'
-      + '縦持ちでは映像が左右に黒帯で letterbox され実効 180×240 になる。'
-      + '見かけdpi = min(実効幅px ÷ マーカー幅インチ, 240 ÷ マーカー高さインチ)。';
+    $('basis').textContent = t('res.basis');
 
     var sel = $('band');
     sel.innerHTML = r.bands.map(function (b, i) {
-      return '<option value="' + i + '">' + i + ': ' + b.dpi.toFixed(1) + ' dpi（'
-        + b.W + '×' + b.H + '、' + b.points.length + '点）</option>';
+      return '<option value="' + i + '">'
+        + t('hm.opt', { i: i, dpi: b.dpi.toFixed(1), w: b.W, h: b.H, n: b.points.length })
+        + '</option>';
     }).join('');
     sel.value = Engine.bandForDpi(r.bands, ev.portrait.dpi);
     sel.onchange = drawHeatmap;
@@ -195,21 +249,24 @@
     drawHeatmap();
   }
 
-  function verdictRow(label, region, d) {
-    return '<div class="verdict"><span>' + label + '（' + region + '）</span>'
-      + '<span class="hint">見かけ ' + d.dpi.toFixed(1) + ' dpi →</span>'
+  function verdictRow(labelKey, px, d) {
+    return '<div class="verdict">'
+      + '<span>' + t(labelKey, { px: px }) + '</span>'
+      + '<span class="hint">' + t('res.apparent', { n: d.dpi.toFixed(1) }) + '</span>'
       + '<span class="n ' + vClass(d.points) + '">' + d.points + '</span>'
-      + '<span class="' + vClass(d.points) + '">点　' + d.verdict + '</span></div>';
+      + '<span class="' + vClass(d.points) + '">' + t('res.points') + '</span>'
+      + '<span class="' + vClass(d.points) + '">' + vText(d.points) + '</span></div>';
   }
 
   function drawHeatmap() {
     var i = parseInt($('band').value, 10);
     var b = state.result.bands[i];
     Heatmap.draw([$('hm0'), $('hm1'), $('hm2')], b);
-    $('band-note').textContent =
-      '有効範囲 ' + b.mindpi.toFixed(1) + '〜' + b.maxdpi.toFixed(1) + ' dpi ／ '
-      + '候補 ' + b.cand.length + ' 画素、うち条件を満たすもの ' + b.usable.length + ' 画素 ／ '
-      + '選ばれた点 ' + b.points.length + '（上限 ' + b.maxFeatureNum + '）';
+    $('band-note').textContent = t('hm.note', {
+      min: b.mindpi.toFixed(1), max: b.maxdpi.toFixed(1),
+      cand: b.cand.length, usable: b.usable.length,
+      n: b.points.length, max2: b.maxFeatureNum
+    });
   }
 
   // ------------------------------------------------------------------
@@ -220,20 +277,19 @@
     var name = ($('name').value || 'marker').replace(/[^\w.-]/g, '_');
     $('gen').disabled = true;
     $('genresult').hidden = true;
-    $('genstat').textContent = '生成器を読み込み中…（初回は約1MB）';
+    $('genstat').textContent = t('gen.loading');
 
     Generator.generate(state.rgba, state.W, state.H, {
       dpi: parseFloat($('dpi').value),
       level: parseInt($('level').value, 10),
       leveli: parseInt($('leveli').value, 10),
       name: name,
-      onLog: function (t) { $('genstat').textContent = '生成中… ' + t; }
+      onLog: function (line) { $('genstat').textContent = t('gen.running', { t: line }); }
     }).then(function (out) {
       $('genstat').textContent = '';
       $('gen').disabled = false;
       $('genresult').hidden = false;
-      $('gensummary').textContent = '生成した（' + (out.ms / 1000).toFixed(1) + ' 秒）。'
-        + '3つとも同じフォルダに置いて使う。';
+      $('gensummary').textContent = t('gen.done', { s: (out.ms / 1000).toFixed(1) });
       var links = $('genlinks');
       links.innerHTML = '';
       [['fset', out.fset], ['fset3', out.fset3], ['iset', out.iset]].forEach(function (e) {
@@ -243,11 +299,19 @@
     }).catch(function (err) {
       $('genstat').textContent = '';
       $('gen').disabled = false;
-      alert('生成に失敗した: ' + err.message);
+      alert(t('err.gen', { m: err.message }));
     });
   });
 
   /** 生成された .fset を読んで、予測と合っていたかを確かめる */
+  // 言語を切り替えたら、動的に組み立てた部分も描き直す
+  self.onI18nChange = function () {
+    if (state.rgba) showImage();
+    if (state.result) showResult();
+  };
+
+  I18N.init();
+
   function check(bytes) {
     var dv = new DataView(bytes.buffer, bytes.byteOffset, bytes.byteLength);
     var n = dv.getInt32(0, true), off = 4, got = [];
@@ -256,11 +320,10 @@
       off += 16 + dv.getInt32(off + 12, true) * 20;
     }
     var want = state.result.bands.map(function (b) { return b.points.length; });
-    if (got.length !== want.length) return '実際の .fset: [' + got + ']';
-    var diff = got.reduce(function (s, g, i) { return s + (g === want[i] ? 0 : 1); }, 0);
+    if (got.length !== want.length) return t('gen.actual', { got: got });
+    var diff = got.reduce(function (a, g, i) { return a + (g === want[i] ? 0 : 1); }, 0);
     return diff === 0
-      ? '予測と実際が全' + got.length + '帯で一致した。'
-      : '予測と実際が ' + diff + '/' + got.length + ' 帯で違った（実際: [' + got + ']）。'
-        + 'のっぺりした絵では生成器側の丸め誤差で数%ずれることがある。';
+      ? t('gen.match', { n: got.length })
+      : t('gen.mismatch', { d: diff, n: got.length, got: got });
   }
 })();

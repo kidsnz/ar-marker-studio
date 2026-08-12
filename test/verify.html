@@ -1,9 +1,9 @@
 <!doctype html>
-<html lang="ja">
+<html lang="en">
 <head>
 <meta charset="utf-8">
 <meta name="viewport" content="width=device-width, initial-scale=1">
-<title>検算 — AR Marker Studio</title>
+<title>Verification — AR Marker Studio</title>
 <link rel="stylesheet" href="../css/style.css">
 <style>
   .ok { color: var(--good); }
@@ -14,41 +14,74 @@
 <body>
 
 <header>
-  <h1>検算</h1>
-  <p class="lead">このページの計算結果が、<strong>本物の生成器の出力と一致するか</strong>を確かめる。<br>
-     期待値は NFT-Marker-Creator を実際に走らせて、そのログから取った実測値
-     （<code>test/fixtures.js</code>）。</p>
+  <p class="langbar">
+    <label for="lang" data-i18n="lang.label">Language</label>
+    <select id="lang">
+      <option value="en">English</option>
+      <option value="ja">日本語</option>
+    </select>
+  </p>
+  <h1 data-i18n="v.title">Verification</h1>
+  <p class="lead" data-i18n="v.lead">Checks that this page's numbers match
+     <strong>what the real generator produces</strong>.
+     The expected values were taken from actually running NFT-Marker-Creator and reading its
+     logs (<code>test/fixtures.js</code>).</p>
 </header>
 
 <main>
 <section>
-  <h2>使い方</h2>
-  <p>マーカーの元画像が入ったフォルダを選ぶ。
-     <a href="https://github.com/kidsnz/ar-marker-studio#検算">README</a> の手順どおりなら
-     <code>projects/atariar/markers</code> を選べばよい。</p>
+  <h2 data-i18n="v.how">How to use</h2>
+  <p data-i18n="v.howto">Choose the folder holding the marker source images.</p>
   <p class="row">
     <input type="file" id="dir" webkitdirectory directory multiple>
-    <button type="button" id="run" class="primary" disabled>検算する</button>
+    <button type="button" id="run" class="primary" disabled data-i18n="v.btn">Run verification</button>
   </p>
-  <p class="hint">画像はブラウザの外に出ない。全部この場で計算する。</p>
+  <p class="hint" data-i18n="v.privacy">The images never leave your browser. Everything is computed here.</p>
 </section>
 
 <section>
-  <h2>結果</h2>
-  <pre id="out">フォルダを選ぶと始められる。</pre>
+  <h2 data-i18n="v.results">Results</h2>
+  <pre id="out"></pre>
 </section>
 </main>
 
-<footer><p><a href="../">← ツールに戻る</a></p></footer>
+<footer><p><a href="../" data-i18n="v.back">← Back to the tool</a></p></footer>
 
+<script src="../js/i18n.js"></script>
 <script src="../js/png.js"></script>
 <script src="../js/engine.js"></script>
 <script src="fixtures.js"></script>
 <script>
 (function () {
   'use strict';
+
+  self.I18N_EN = self.I18N_EN || {};
+  var EN = {
+    'v.ready': 'Choose a folder to begin.',
+    'v.loaded': 'Loaded {n} files. Press "Run verification".',
+    'v.missing': '{name} is not in the folder you chose',
+    'v.working': 'working…',
+    'v.exact': '[1] High-contrast artwork (must match exactly)',
+    'v.tolerant': '[2] Flat artwork (known to drift because of the generator\'s own float32 rounding)',
+    'v.tol': '  (tolerance {n}%)',
+    'v.predicted': '        predicted [{v}]',
+    'v.actual': '        actual    [{v}]',
+    'v.candNg': '        NG candidates [{got}] / actual [{want}]',
+    'v.pass': 'Result: all passed',
+    'v.fail': 'Result: failed ({n})'
+  };
+  Object.keys(EN).forEach(function (k) {
+    if (self.I18N_EN[k] == null) self.I18N_EN[k] = EN[k];
+  });
+  var t = function (k, v) { return I18N.t(k, v); };
+
   var files = {};
   var out = document.getElementById('out');
+
+  self.onI18nChange = function () {
+    if (!out.dataset.started) out.textContent = t('v.ready');
+  };
+  I18N.init();
 
   document.getElementById('dir').addEventListener('change', function (e) {
     files = {};
@@ -58,11 +91,12 @@
       files[parts.slice(-2).join('/')] = f;
     });
     document.getElementById('run').disabled = false;
-    out.textContent = Object.keys(files).length + ' 個のファイルを読み込んだ。「検算する」を押す。';
+    out.textContent = t('v.loaded', { n: Object.keys(files).length });
   });
 
   document.getElementById('run').addEventListener('click', function () {
     document.getElementById('run').disabled = true;
+    out.dataset.started = '1';
     out.textContent = '';
     run().then(function () { document.getElementById('run').disabled = false; });
   });
@@ -72,6 +106,7 @@
     if (cls) span.className = cls;
     span.textContent = s + '\n';
     out.appendChild(span);
+    return span;
   }
 
   function pad(s, n) { while (s.length < n) s += ' '; return s; }
@@ -81,10 +116,9 @@
     for (var i = 0; i < cases.length; i++) {
       var c = cases[i];
       var f = files[c.image];
-      if (!f) { log('  --  ' + c.image + ' が選んだフォルダに無い'); bad++; continue; }
+      if (!f) { log('  --  ' + t('v.missing', { name: c.image })); bad++; continue; }
 
-      log('  ..  ' + pad(c.image, 30) + ' 計算中…');
-      var last = out.lastChild;
+      var pending = log('  ..  ' + pad(c.image, 30) + ' ' + t('v.working'));
       await new Promise(function (r) { setTimeout(r, 10); });   // 画面を更新させる
 
       var png = await PNGReader.decode(await f.arrayBuffer());
@@ -100,27 +134,26 @@
       var okc = gc[0] === c.counts[0] && gc[1] === c.counts[1];
       if (!ok || !okc) bad++;
 
-      out.removeChild(last);
+      out.removeChild(pending);
       log('  ' + (ok && okc ? 'OK ' : 'NG ') + pad(c.image, 30)
-        + ' -dpi=' + c.dpi + ' -level=' + c.level + '  候補 ' + gc[0] + '/' + gc[1]
-        + (tol ? '  （許容 ' + tol * 100 + '%）' : ''), ok && okc ? 'ok' : 'ng');
+        + ' -dpi=' + c.dpi + ' -level=' + c.level + '  cand ' + gc[0] + '/' + gc[1]
+        + (tol ? t('v.tol', { n: tol * 100 }) : ''), ok && okc ? 'ok' : 'ng');
       if (!ok) {
-        log('        予測 [' + got + ']', 'ng');
-        log('        実際 [' + c.points + ']', 'ng');
+        log(t('v.predicted', { v: got }), 'ng');
+        log(t('v.actual', { v: c.points }), 'ng');
       }
-      if (!okc) log('        NG 候補数 [' + gc + '] / 実際 [' + c.counts + ']', 'ng');
+      if (!okc) log(t('v.candNg', { got: gc, want: c.counts }), 'ng');
     }
     return bad;
   }
 
   async function run() {
-    log('[1] コントラストのある絵（完全一致を要求する）');
+    log(t('v.exact'));
     var bad = await runCases(Fixtures.EXACT, 0);
-    log('[2] のっぺりした絵（生成器側の float32 の丸めでずれる既知のケース）');
+    log(t('v.tolerant'));
     bad += await runCases(Fixtures.TOLERANT, Fixtures.TOLERANCE);
     log('');
-    log('判定: ' + (bad === 0 ? 'すべて合格' : '不合格（' + bad + ' 件）'),
-        bad === 0 ? 'ok' : 'ng');
+    log(bad === 0 ? t('v.pass') : t('v.fail', { n: bad }), bad === 0 ? 'ok' : 'ng');
   }
 })();
 </script>
