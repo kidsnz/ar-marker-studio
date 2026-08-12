@@ -82,6 +82,27 @@ the number of points jumps up and down. Measured on satoshi/03 held upright: 39c
 points, 41cm gives 8, 49cm gives 12 again. Reporting a plain "from X to Y" would be a lie, so
 the tool reports the longest continuous stretch and how many separate stretches there are.
 
+## Detection is a separate problem from tracking
+
+NFT has two independent halves, and they fail differently:
+
+| Symptom | Culprit |
+|---|---|
+| It never recognises the marker | `.fset3` (detection) is weak |
+| It recognises but the pose wobbles | `.fset` (tracking) has too few points |
+
+After you generate, the tool reads the `.fset3` and adds a **Detection** column to the band
+table. **A band with 0 detection keypoints cannot be recognised at that distance at all**, no
+matter how many tracking points it has.
+
+There is deliberately **no "repetitive pattern" score**. The idea is sound — the matcher uses a
+ratio test (best/second-best < 0.7), so near-identical descriptors elsewhere in the image cancel
+each other out — but every marker to hand recognises fine, so there was no failing example to
+calibrate a threshold against. An attempt to manufacture one by feeding synthetic camera frames
+to the real detector did not work: even handing it the exact image the descriptors were built
+from, full frame, produced no detection (while the negative control behaved correctly). Rather
+than ship a number nobody can check, the tool reports the counts and stops there.
+
 ## Why the total point count is meaningless
 
 A `.fset` splits its points across distance bands (scales). At runtime only the band matching

@@ -60,6 +60,12 @@
     'err.dpi': 'That dpi is not valid',
     'err.calc': 'Calculation failed: {m}',
     'err.gen': 'Generation failed: {m}',
+    'tbl.detect': 'Detection',
+    'det.note': 'Detection keypoints come from the generated .fset3. A band with 0 cannot be '
+      + 'recognised at all at that distance, no matter how many tracking points it has. '
+      + '"It never recognises" and "it recognises but wobbles" are different problems.',
+    'det.summary': 'Detection keypoints in the band used {who}: {n}',
+    'det.none': 'Detection keypoints in the band used {who}: none, so it cannot be recognised there',
     'dist.range': '{who}: stable between {min} and {max} ({n}+ points)',
     'dist.rangeMin': '{who}: tracks at all between {min} and {max} ({n}+ points)',
     'dist.none': '{who}: never reaches {n} points at any distance',
@@ -72,7 +78,8 @@
     if (self.I18N_EN[k] == null) self.I18N_EN[k] = EN[k];
   });
   var t = function (k, v) { return I18N.t(k, v); };
-  var state = { rgba: null, W: 0, H: 0, name: 'marker', isPNG: true, result: null };
+  var state = { rgba: null, W: 0, H: 0, name: 'marker', isPNG: true,
+                result: null, detect: null };
 
   // ------------------------------------------------------------------
   // 1. 画像を読む
@@ -107,6 +114,7 @@
     }).then(function (img) {
       state.rgba = img.data; state.W = img.width; state.H = img.height;
       state.isPNG = isPNG;
+      state.detect = null;              // 画像を変えたら前の検出結果は捨てる
       showImage();
     }).catch(function (err) {
       alert(t('err.image', { m: err.message }));
@@ -233,19 +241,48 @@
       var used = [];
       if (b.mindpi <= ev.portrait.dpi && ev.portrait.dpi <= b.maxdpi) used.push(t('res.portrait.short'));
       if (b.mindpi <= ev.landscape.dpi && ev.landscape.dpi <= b.maxdpi) used.push(t('res.landscape.short'));
+      var det = state.detect && state.detect.levels[i];
       return '<tr class="' + (used.length ? 'used' : '') + '">'
         + '<td>' + i + '</td>'
         + '<td>' + t('tbl.rangeFmt', { min: b.mindpi.toFixed(1),
                                         max: b.maxdpi.toFixed(1) }) + '</td>'
         + '<td>' + b.W + '×' + b.H + '</td>'
         + '<td>' + b.points.length + '</td>'
+        + (state.detect
+            ? '<td class="' + (det && det.count ? '' : 'v-bad') + '">'
+              + (det ? det.count : '-') + '</td>'
+            : '')
         + '<td><span class="bar" style="width:' + (b.points.length / max * 100) + '%"></span>'
         + (used.length ? '<span class="tag">'
             + t('res.usedBy', { who: used.join(' / ') }) + '</span>' : '')
         + '</td></tr>';
     }).join('');
 
+    // 検出列の見出しは、生成後にだけ出す
+    var headRow = $('bands').querySelector('thead tr');
+    var detTh = headRow.querySelector('.det-col');
+    if (state.detect && !detTh) {
+      var th = document.createElement('th');
+      th.className = 'det-col';
+      th.textContent = t('tbl.detect');
+      headRow.insertBefore(th, headRow.lastElementChild);
+    } else if (!state.detect && detTh) {
+      detTh.remove();
+    }
+
     $('basis').textContent = t('res.basis');
+    if (state.detect) {
+      var extra = [['res.portrait.short', ev.portrait], ['res.landscape.short', ev.landscape]]
+        .map(function (e) {
+          var n = 0;
+          r.bands.forEach(function (b, i) {
+            var d = state.detect.levels[i];
+            if (d && b.mindpi <= e[1].dpi && e[1].dpi <= b.maxdpi) n += d.count;
+          });
+          return t(n ? 'det.summary' : 'det.none', { who: t(e[0]), n: n });
+        }).join(' / ');
+      $('basis').textContent += '  ' + extra + '  ' + t('det.note');
+    }
 
     var sel = $('band');
     sel.innerHTML = r.bands.map(function (b, i) {
@@ -365,6 +402,11 @@
       $('gen').disabled = false;
       $('genresult').hidden = false;
       $('gensummary').textContent = t('gen.done', { s: (out.ms / 1000).toFixed(1) });
+      // 生成できたので検出側（.fset3）も読んで、距離帯の表に足す
+      try {
+        state.detect = FSet3.parse(out.fset3);
+        if (state.detect) showResult();
+      } catch (e) { state.detect = null; }
       var links = $('genlinks');
       links.innerHTML = '';
       [['fset', out.fset], ['fset3', out.fset3], ['iset', out.iset]].forEach(function (e) {
