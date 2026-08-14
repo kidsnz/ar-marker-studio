@@ -115,24 +115,52 @@ A `.fset` splits its points across distance bands (scales). At runtime only the 
 the **apparent resolution** of the marker in the camera is used. A marker with 92 points in
 total can have just 14 in the band you actually use.
 
-And **ARnft processes the camera image at a fixed 320×240** (hardcoded in `prepareImage()` in
-`ARnft.js`). Hold the phone upright and the video is letterboxed, leaving **180×240 effective**.
-"My camera is 640px so I'm fine" is wrong, and getting this backwards throws the verdict off by
-a factor of 3.5.
+And **ARnft processes the camera image on a fixed 320×240 canvas** (hardcoded in `prepareImage()`
+in `ARnft.js`). "My camera is 640px so I'm fine" is wrong, and getting this backwards throws the
+verdict off by a factor of 3.5.
+
+Two things shrink it further, and both have to be counted:
+
+1. **How the video lands on the canvas.** Stock ARnft letterboxes an upright phone, so the marker
+   only gets 180×240 of the canvas. This tool assumes the rotated pipeline instead
+   (`ARnft-rot.js`: turn the video 90° and rotate the projection matrix back), which gives the
+   marker **240×320** — the same canvas, without the black bars.
+2. **`object-fit: cover`.** The video is displayed cropped, so roughly a quarter of it is never
+   on screen, and you cannot put a marker where the user cannot see it. On the measured device
+   (600×800 video, 375×664 screen) that leaves **75.3%** of the width.
 
 ```
-apparent dpi = min( effective width px ÷ marker width in inches,
-                    240 ÷ marker height in inches )
-   effective width px = 320 held sideways / 180 held upright
+apparent dpi = min( effective width px  ÷ marker width in inches,
+                    effective height px ÷ marker height in inches )
+
+   held upright, rotated pipeline   240 × 0.753 = 181  ×  320
+   held upright, stock letterbox    180 × 0.753 = 136  ×  240
+   held sideways                    320  ×  240 × 0.753 = 181
 ```
 
-Measured against real devices, holding the phone upright:
+### These thresholds need re-measuring
 
-| Usable points | How it behaves |
+| Usable points | How it behaved |
 |---|---|
 | 14 | stable |
 | 9 | mostly stable, slight jitter |
 | 3 | jumps around, unusable |
+
+Those counts were produced by an older version that used a 180px width for an upright phone —
+the letterbox canvas width, without subtracting the `object-fit: cover` crop. That number happens
+to land within a pixel of the 181px this tool now uses for the rotated pipeline, so **the table
+carries over rather than being invalidated**.
+
+What has *not* been settled is a contradiction inside the older notes. Recomputed under the stock
+letterbox model (136px), the same three markers come out at 3, **2** and 4 points — so the middle
+one, written down as "mostly stable", sits below the 3-point floor where tracking stops outright,
+and the felt ordering no longer matches. The most likely explanation is that the notes were taken
+with the phone close enough that the marker overflowed the screen edges, which is a different
+framing from the one the tool assumes. Until that is checked on a device, treat "stable" and
+"marginal" as provisional.
+
+The one number that is not a judgement call is the floor: below 3 points tracking stops, and that
+comes from `tracking.c` (`if(num < 3) return -3`), not from how anything felt.
 
 ## What actually increases the point count
 

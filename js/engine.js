@@ -44,10 +44,71 @@
     4: [0.98, 0.45, 6.0, 12]
   };
 
-  // ARnft が実際に画像処理する領域（ARnft.js の prepareImage が 320 固定）
-  var REGION_LANDSCAPE = [320, 240];   // 横持ち
-  var REGION_PORTRAIT = [180, 240];    // 縦持ち: 左右に黒帯が入り実効180px
-  var GOOD = 12, POOR = 5;             // 実機の体感と対応させた判定の目安
+  // ------------------------------------------------------------------
+  // 判定に使える画素数
+  //
+  // ARnft は映像を 320x240 の画布に載せてから処理する（prepareImage が 320 固定）。
+  // **ただし画布の全部が判定に使えるわけではない。** 映像は画面に
+  // `object-fit: cover` で表示されるので、はみ出した分は利用者に見えていない。
+  // 見えていないところにマーカーを置くことはできないから、その分は差し引く。
+  // ここを忘れると全部が過大評価になる（ガイド第12章）。
+  //
+  //   実効幅 = 画布上の幅 × 可視率
+  //
+  // 実測（iPhone、映像600x800、画面375x664）:
+  //   元の黒帯方式  画布上 180px → 実効 136px
+  //   回転版（本番）画布上 240px → 実効 181px
+  // ------------------------------------------------------------------
+  var PROCESS = [320, 240];   // ARnft の画布。向きに関係なくこの大きさ
+
+  /**
+   * `object-fit: cover` で映像のどれだけが画面に映っているか。
+   * 細い方の軸が切られ、もう一方は丸ごと見えている。
+   * @returns {{w:number,h:number}} 幅・高さそれぞれの可視率（片方は必ず 1）
+   */
+  function visibleFraction(videoW, videoH, screenW, screenH) {
+    var vr = videoW / videoH, sr = screenW / screenH;
+    return vr > sr ? { w: sr / vr, h: 1 } : { w: 1, h: vr / sr };
+  }
+
+  // 既定の可視率。ガイド第12章で実機確認した条件（映像600x800、画面375x664）。
+  // スマホを横にすると映像も画面も一緒に回るので、切られる軸が入れ替わるだけで
+  // 割合は同じ 0.753 になる。端末が変われば visibleFraction() で出し直す
+  var VISIBLE_PORTRAIT = visibleFraction(600, 800, 375, 664);   // {w:0.753, h:1}
+  var VISIBLE_LANDSCAPE = visibleFraction(800, 600, 664, 375);  // {w:1, h:0.753}
+
+  /**
+   * 判定に使える画素数を出す。
+   * @param mode 'rotate'    ARnft-rot（縦持ちで映像を90度回す。**本番はこれ**）
+   *             'letterbox' 素の ARnft（縦持ちで左右に黒帯が入る）
+   *             'landscape' 横持ち
+   * @param vis  visibleFraction() の戻り値。省略すると実測の iPhone の値
+   */
+  function regionFor(mode, vis) {
+    // 縦持ちで映像を回すと、映像の短辺が画布の 240 側ではなく 320 側に載る。
+    // つまりマーカーの横方向に使える画素が 180 から 240 に増える
+    var canvas = mode === 'rotate'    ? [240, 320]
+               : mode === 'letterbox' ? [180, 240]
+               :                        [320, 240];
+    var v = vis || (mode === 'landscape' ? VISIBLE_LANDSCAPE : VISIBLE_PORTRAIT);
+    // 3つ目は**切り取られる前**の映像の長辺（画布上の画素数）。
+    // 距離の計算に使う焦点距離はレンズと画布で決まるもので、
+    // 画面に何が映っているかとは関係ないので、可視率を掛けてはいけない。
+    // 配列の 0/1 番目だけを見る既存の呼び出しはそのまま動く
+    return [canvas[0] * v.w, canvas[1] * v.h, Math.max(canvas[0], canvas[1])];
+  }
+
+  // 既定の判定領域。**縦持ちは回転版（本番の実装）を前提にする**
+  var REGION_PORTRAIT = regionFor('rotate');               // 実効 181 x 320
+  var REGION_PORTRAIT_LETTERBOX = regionFor('letterbox');  // 素の ARnft: 136 x 240
+  var REGION_LANDSCAPE = regionFor('landscape');           // 実効 320 x 181
+
+  // 実機の体感と対応させた判定の目安。
+  // **【要注意】この2つは回転改造の前の体感が根拠で、いま裏付けが無い。**
+  // 回転後に satoshi/01 が3点のまま実用になったことで、少なくとも
+  // 「9点でほぼ安定 / 14点で安定」は成り立たなくなっている。実機で測り直すまで
+  // これは目安として弱い（TRACK_MIN=3 だけはソースで裏が取れている別物）
+  var GOOD = 12, POOR = 5;
 
   // --- 実行時（追従）の仕様。lib/SRC/AR2/tracking.c と selectTemplate.c より ---
   // これらは「点が何点あればいいのか」を決めている本体なので、判定に反映する。
@@ -545,11 +606,15 @@
   var CAMERA_FOV_LONG = 55.4;    // センサーの長辺方向の画角（度）
 
   /**
-   * 処理キャンバス上での焦点距離（px）。持ち方で変わる。
-   * 横持ちは長辺が 320px、縦持ちは映像が回るので長辺が 240px になる。
+   * 処理キャンバス上での焦点距離（px）。
+   *
+   * 画角はセンサー全体のものなので、**映像の長辺が画布の何画素に載るか**で決まる。
+   * 画面に映っていない部分（object-fit: cover の切り落とし）もレンズは写しているので、
+   * ここに可視率を掛けてはいけない。regionFor() が3つ目に入れている値がそれ。
+   * 素の [w, h] を渡されたときは長辺で代用する（短辺が切られる普通の場合は一致する）。
    */
   function focalPx(region) {
-    var longPx = Math.max(region[0], region[1]);
+    var longPx = region[2] || Math.max(region[0], region[1]);
     return (longPx / 2) / Math.tan(CAMERA_FOV_LONG / 2 * Math.PI / 180);
   }
 
@@ -695,7 +760,11 @@
 
   var Engine = {
     TS: TS, TN: TN, LEVELS: LEVELS,
+    PROCESS: PROCESS,
     REGION_PORTRAIT: REGION_PORTRAIT, REGION_LANDSCAPE: REGION_LANDSCAPE,
+    REGION_PORTRAIT_LETTERBOX: REGION_PORTRAIT_LETTERBOX,
+    VISIBLE_PORTRAIT: VISIBLE_PORTRAIT, VISIBLE_LANDSCAPE: VISIBLE_LANDSCAPE,
+    visibleFraction: visibleFraction, regionFor: regionFor,
     GOOD: GOOD, POOR: POOR,
     TRACK_MIN: TRACK_MIN, TRACK_PER_FRAME: TRACK_PER_FRAME, EDGE_MARGIN: EDGE_MARGIN,
     toBW: toBW, dpiLevels: dpiLevels, scaleImage: scaleImage, bandRanges: bandRanges,

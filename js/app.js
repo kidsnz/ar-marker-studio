@@ -47,8 +47,8 @@
     'pick.applied': 'Applied. The working image is now {k}× and -dpi/-level are filled in. '
       + 'The three files are generated already, so the buttons above download them as they are.',
 
-    'res.portrait': 'Held upright ({px}px effective)',
-    'res.landscape': 'Held sideways ({px}px effective)',
+    'res.portrait': 'Held upright ({w}×{h}px usable)',
+    'res.landscape': 'Held sideways ({w}×{h}px usable)',
     'res.portrait.short': 'upright',
     'res.landscape.short': 'sideways',
     'res.apparent': 'apparent {n} dpi →',
@@ -62,14 +62,17 @@
     'verdict.cannot': 'cannot track',
     'res.detail': '{sel} of them can actually be picked / spread {spread}% / {fb} with the runtime fallback',
     'res.floor': 'Tracking stops below {n} points, so one lost point ends it.',
+    'res.provisional': '<strong>"stable" and "marginal" are provisional.</strong> The {good} and {poor} point thresholds were calibrated against the same ~181px width this tool now uses, so they carry over — but the device notes they came from contain a contradiction that is still open: a marker written down as steady works out at 2 points under the stock letterbox model, below the {floor}-point floor where tracking stops outright. Only that {floor}-point floor comes from the source (tracking.c) rather than from how something felt.',
     'res.cap': 'Only {n} points are tried per frame, so more than that buys little. Spread matters more than count.',
     'res.spreadNote': 'Spread is the area the points enclose, as a share of the marker. '
       + 'The tracker picks its first four points to maximise exactly this. '
       + 'Measured on real devices: 1% jumps around, 17% mostly stable, 33% stable.',
-    'res.basis': 'ARnft processes the camera image at a fixed 320×240 (hardcoded in '
-      + 'ARnft.js prepareImage). Held upright the video is letterboxed, leaving 180×240 '
-      + 'effective. apparent dpi = min(effective width px ÷ marker width in inches, '
-      + '240 ÷ marker height in inches).',
+    'res.basis': 'ARnft processes the camera image on a fixed 320×240 canvas (hardcoded in '
+      + 'ARnft.js prepareImage). Held upright, ARnft-rot turns the video 90° so the marker '
+      + 'gets 240×320 of that canvas instead of the 180×240 the stock letterbox leaves. '
+      + 'On top of that, `object-fit: cover` keeps about a quarter of the video off-screen, '
+      + 'so what is actually usable is 181×320. apparent dpi = min(effective width px ÷ '
+      + 'marker width in inches, effective height px ÷ marker height in inches).',
     'progress.band': 'Band {i}/{n} ({w}×{h}, {dpi}dpi)…',
     'progress.prep': 'Preparing…',
     'progress.final': 'Finishing…',
@@ -303,8 +306,8 @@
     $('picks').innerHTML = cards.map(cardHtml).join('');
     $('picks').hidden = false;
 
-    var notes = [t('search.region', { w: Engine.REGION_PORTRAIT[0],
-                                      h: Engine.REGION_PORTRAIT[1] })];
+    var notes = [t('search.region', { w: Math.round(Engine.REGION_PORTRAIT[0]),
+                                      h: Math.round(Engine.REGION_PORTRAIT[1]) })];
     if (search.skipped.length) {
       notes.push(t('search.skipped', {
         list: search.skipped.map(function (k) { return k + '×'; }).join(', '),
@@ -505,8 +508,10 @@
         w: r.W, h: r.H, dpi: +r.dpi.toFixed(2), level: r.level,
         mw: ev.widthMm.toFixed(0), mh: ev.heightMm.toFixed(0), total: ev.total
       }) + '</p>'
-      + verdictRow('res.portrait', Engine.REGION_PORTRAIT[0], ev.portrait)
-      + verdictRow('res.landscape', Engine.REGION_LANDSCAPE[0], ev.landscape)
+      + verdictRow('res.portrait', Engine.REGION_PORTRAIT, ev.portrait)
+      + verdictRow('res.landscape', Engine.REGION_LANDSCAPE, ev.landscape)
+      + '<p class="warn">' + t('res.provisional', { good: Engine.GOOD, poor: Engine.POOR,
+                                                    floor: Engine.TRACK_MIN }) + '</p>'
       + '<p class="hint">' + t('res.spreadNote') + '</p>';
 
     var max = Math.max.apply(null, r.bands.map(function (b) { return b.points.length; })) || 1;
@@ -574,7 +579,7 @@
     drawHeatmap();
   }
 
-  function verdictRow(labelKey, px, d) {
+  function verdictRow(labelKey, region, d) {
     var note = '';
     if (d.points < Engine.POOR) {
       note = '<div class="note v-bad">' + t('res.floor', { n: Engine.TRACK_MIN }) + '</div>';
@@ -582,7 +587,8 @@
       note = '<div class="note">' + t('res.cap', { n: Engine.TRACK_PER_FRAME }) + '</div>';
     }
     return '<div class="verdict">'
-      + '<span>' + t(labelKey, { px: px }) + '</span>'
+      + '<span>' + t(labelKey, { w: Math.round(region[0]),
+                                 h: Math.round(region[1]) }) + '</span>'
       + '<span class="hint">' + t('res.apparent', { n: d.dpi.toFixed(1) }) + '</span>'
       + '<span class="n ' + vClass(d.points) + '">' + d.points + '</span>'
       + '<span class="' + vClass(d.points) + '">' + t('res.points') + '</span>'
