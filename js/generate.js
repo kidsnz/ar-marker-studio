@@ -16,7 +16,7 @@
    * マーカーを生成する。
    * @param {Uint8ClampedArray} rgba 元画像（RGBA）
    * @param {number} W,H 画素数
-   * @param {Object} opts {dpi, level, leveli, name, onLog}
+   * @param {Object} opts {dpi, level, leveli, name, onLog, quiet}
    * @returns {Promise<{fset,fset3,iset,ms,params}>}
    */
   function generate(rgba, W, H, opts) {
@@ -35,24 +35,48 @@
       if (nc === 3) { arr[p++] = rgba[q + 1]; arr[p++] = rgba[q + 2]; }
     }
 
+    return run({
+      arr: arr, W: W, H: H, nc: nc,
+      dpi: opts.dpi, level: opts.level, leveli: opts.leveli,
+      name: opts.name || 'marker', quiet: !!opts.quiet
+    }, opts.onLog);
+  }
+
+  // ------------------------------------------------------------------
+  // ワーカーは1つだけ作って使い回す。
+  // 自動探索では25通り生成するので、毎回作り直すと wasm の初期化を25回やることになる。
+  // ------------------------------------------------------------------
+  var worker = null, seq = 0, waiting = {};
+
+  function getWorker() {
+    if (worker) return worker;
+    worker = new Worker('js/genworker.js');
+    worker.onmessage = function (e) {
+      var m = e.data, w = waiting[m.id];
+      if (!w) return;
+      if (m.type === 'log') { if (w.onLog) w.onLog(m.text); return; }
+      delete waiting[m.id];
+      if (m.type === 'done') w.resolve(m);
+      else w.reject(new Error(m.message || '生成に失敗した'));
+    };
+    worker.onerror = function (err) {
+      var msg = err.message || '生成器を読み込めなかった';
+      Object.keys(waiting).forEach(function (k) {
+        waiting[k].reject(new Error(msg)); delete waiting[k];
+      });
+      // 壊れたワーカーは捨てる。次の呼び出しで作り直す
+      try { worker.terminate(); } catch (ignore) {}
+      worker = null;
+    };
+    return worker;
+  }
+
+  function run(msg, onLog) {
     return new Promise(function (resolve, reject) {
-      var w = new Worker('js/genworker.js');
-      w.onmessage = function (e) {
-        var m = e.data;
-        if (m.type === 'log') { if (opts.onLog) opts.onLog(m.text); return; }
-        w.terminate();
-        if (m.type === 'done') resolve(m);
-        else reject(new Error(m.message || '生成に失敗した'));
-      };
-      w.onerror = function (err) {
-        w.terminate();
-        reject(new Error(err.message || '生成器を読み込めなかった'));
-      };
-      w.postMessage({
-        arr: arr, W: W, H: H, nc: nc,
-        dpi: opts.dpi, level: opts.level, leveli: opts.leveli,
-        name: opts.name || 'marker'
-      }, [arr.buffer]);
+      var w = getWorker();
+      msg.id = ++seq;
+      waiting[msg.id] = { resolve: resolve, reject: reject, onLog: onLog };
+      w.postMessage(msg, [msg.arr.buffer]);
     });
   }
 
