@@ -19,6 +19,34 @@
     'meta.rgb': 'colour → converted with (r+g+b)/3',
     'meta.png': 'PNG (decoded here, so values match the generator exactly)',
     'meta.jpeg': 'JPEG (decoded by canvas; values differ slightly from the generator)',
+    'meta.scale': 'Upscaled',
+    'meta.scaleV': '{k}× nearest-neighbour (source was {w}×{h})',
+
+    // --- 3. 自動探索 ---
+    'search.progress': 'Generating and scoring… {i}/{n}',
+    'search.took': 'Tried {n} combinations in {s}s. Every number below is measured, not predicted.',
+    'search.none': 'Nothing could be generated, so there is nothing to recommend.',
+    'search.failed': '{d} of the {n} could not be generated and are left out.',
+    'search.skipped': 'Not tried: {list}, because upscaling would push the image past '
+      + '{mp} megapixels and the browser would run out of memory.',
+    'search.region': 'Scored for a phone held upright ({w}×{h} effective), the same basis as the verdict below.',
+    'pick.best': 'Best tracking',
+    'pick.balanced': 'Balanced',
+    'pick.small': 'Smallest',
+    'pick.set': '{k}× / -level={lv} / -dpi={dpi}   ({w}×{h})',
+    'pick.size': '{kb} KB in total   (.fset {f} / .fset3 {f3} / .iset {i} KB)',
+    'pick.profileNote': 'Tracking points by how much of the frame the marker fills:',
+    'why.best': 'Usable at {c} of the {n} distances, spread {s}%. The best of the {tried} tried.',
+    'why.balanced': 'Same {c}/{n} distances as the best one, spread {s}% against its {s2}%, {d} KB smaller.',
+    'why.balanced.eq': 'Same {c}/{n} distances and the same {s}% spread as the best one, {d} KB smaller.',
+    'why.balanced.same': 'Nothing smaller holds that quality, so this is the balanced choice too.',
+    'why.small': 'Gives up one distance ({c}/{n}) to save {d} KB against the balanced choice.',
+    'why.small.eq': 'Same {c}/{n} distances but spread {s}% instead of {s2}%, {d} KB smaller.',
+    'why.small.same': 'Nothing smaller was worth taking, so the balanced choice is also the smallest.',
+    'btn.use': 'Use these settings',
+    'pick.applied': 'Applied. The working image is now {k}× and -dpi/-level are filled in. '
+      + 'The three files are generated already, so the buttons above download them as they are.',
+
     'res.portrait': 'Held upright ({px}px effective)',
     'res.landscape': 'Held sideways ({px}px effective)',
     'res.portrait.short': 'upright',
@@ -78,8 +106,11 @@
     if (self.I18N_EN[k] == null) self.I18N_EN[k] = EN[k];
   });
   var t = function (k, v) { return I18N.t(k, v); };
+  // rgba/W/H は「いま作業している画像」。おすすめを適用すると拡大版に差し替わる。
+  // orig は読み込んだそのままの画像で、拡大の元は必ずこちらを使う
+  // （作業中の画像を拡大すると、2回適用したときに倍率が掛け算になってしまう）
   var state = { rgba: null, W: 0, H: 0, name: 'marker', isPNG: true,
-                result: null, detect: null };
+                orig: null, scale: 1, result: null, detect: null };
 
   // ------------------------------------------------------------------
   // 1. 画像を読む
@@ -113,8 +144,11 @@
       return decodeViaCanvas(file);
     }).then(function (img) {
       state.rgba = img.data; state.W = img.width; state.H = img.height;
+      state.orig = { rgba: img.data, W: img.width, H: img.height };
+      state.scale = 1;
       state.isPNG = isPNG;
       state.detect = null;              // 画像を変えたら前の検出結果は捨てる
+      clearSearch();                    // 前の画像で探した結果も捨てる
       showImage();
     }).catch(function (err) {
       alert(t('err.image', { m: err.message }));
@@ -142,14 +176,22 @@
     var info = Engine.toBW(state.rgba, state.W, state.H);
     $('imgmeta').innerHTML =
       row(t('meta.size'), state.W + ' × ' + state.H)
+      + (state.scale > 1
+          ? row(t('meta.scale'), t('meta.scaleV', { k: state.scale,
+                                                    w: state.orig.W, h: state.orig.H }))
+          : '')
       + row(t('meta.color'), t(info.nc === 1 ? 'meta.gray' : 'meta.rgb'))
       + row(t('meta.format'), t(state.isPNG ? 'meta.png' : 'meta.jpeg'));
     $('imginfo').hidden = false;
     $('alpha-warn').hidden = !info.hasAlpha;
 
     $('step-config').hidden = false;
+    $('step-search').hidden = false;
+    $('name').value = state.name;
     syncDpiFromMm();
-    ['step-result', 'step-heatmap', 'step-generate'].forEach(function (s) { $(s).hidden = true; });
+    // 作業中の画像が変わったので、前の判定は消す（step-distance の消し忘れがあった）
+    ['step-result', 'step-distance', 'step-heatmap', 'step-generate']
+      .forEach(function (s) { $(s).hidden = true; });
   }
 
   function row(k, v) { return '<dt>' + k + '</dt><dd>' + v + '</dd>'; }
@@ -175,7 +217,239 @@
   });
 
   // ------------------------------------------------------------------
-  // 3. 予測を走らせる
+  // 3. 自動探索 — 拡大率 × level を総当たりし、**実際に生成して**比べる
+  //
+  // 予測ではなく実生成で探す。実測で生成の方が速く（1倍 0.36秒 / 4倍 1.31秒）、
+  // しかも正確な点数とファイルサイズが同時に手に入る。
+  // 拡大の元は必ず state.orig（読み込んだそのままの画像）を使う。
+  // ------------------------------------------------------------------
+  var search = { results: null, picks: null, cards: null, skipped: [] };
+
+  function clearSearch() {
+    search = { results: null, picks: null, cards: null, skipped: [] };
+    $('picks').innerHTML = '';
+    $('picks').hidden = true;
+    $('search-note').hidden = true;
+    $('search-all').hidden = true;
+    $('search-progress').textContent = '';
+  }
+
+  function pct(x) { return (x * 100).toFixed(1); }
+  function toKb(bytes) { return (bytes / 1024).toFixed(1); }
+
+  $('search-run').addEventListener('click', function () {
+    if (!state.orig) return;
+    var mm = parseFloat($('size-mm').value);
+    if (!(mm > 0)) { alert(t('err.dpi')); return; }
+
+    var o = state.orig;
+    var hMm = mm * o.H / o.W;
+    var scales = Search.usableScales(o.W, o.H);
+    var skipped = Search.SCALES.filter(function (k) { return scales.indexOf(k) < 0; });
+    var total = scales.length * Search.LEVELS.length;
+
+    clearSearch();
+    search.skipped = skipped;
+    $('search-run').disabled = true;
+    $('gen').disabled = true;        // 生成ワーカーは1つしかないので取り合わせない
+    $('search-progress').textContent = t('search.progress', { i: 0, n: total });
+
+    var t0 = Date.now();
+    Search.search(o.rgba, o.W, o.H, {
+      wMm: mm, hMm: hMm,
+      leveli: parseInt($('leveli').value, 10),
+      scales: scales,
+      onProgress: function (done, n) {
+        $('search-progress').textContent = t('search.progress', { i: done, n: n });
+      }
+    }).then(function (results) {
+      var msg = t('search.took', {
+        n: results.length, s: ((Date.now() - t0) / 1000).toFixed(1) });
+      // 生成が通らなかったものがあれば黙って落とさず、いくつ落ちたか言う
+      if (results.length < total) {
+        msg += '　' + t('search.failed', { d: total - results.length, n: total });
+      }
+      $('search-progress').textContent = msg;
+      search.results = results;
+      search.picks = Search.pick(results);
+      showPicks();
+    }).catch(function (err) {
+      $('search-progress').textContent = '';
+      alert(t('err.gen', { m: err.message }));
+    }).then(function () {
+      $('search-run').disabled = false;
+      $('gen').disabled = false;
+    });
+  });
+
+  function showPicks() {
+    var p = search.picks;
+    if (!p) {
+      $('search-note').textContent = t('search.none');
+      $('search-note').hidden = false;
+      return;
+    }
+    // 同じ設定が2役を兼ねることがある（よくある）ので、まとめて1枚の札にする
+    var cards = [];
+    [['pick.best', p.best], ['pick.balanced', p.balanced], ['pick.small', p.small]]
+      .forEach(function (e) {
+        var hit = null;
+        cards.forEach(function (c) { if (c.r === e[1]) hit = c; });
+        if (hit) hit.roles.push(e[0]);
+        else cards.push({ r: e[1], roles: [e[0]] });
+      });
+    search.cards = cards;
+
+    $('picks').innerHTML = cards.map(cardHtml).join('');
+    $('picks').hidden = false;
+
+    var notes = [t('search.region', { w: Engine.REGION_PORTRAIT[0],
+                                      h: Engine.REGION_PORTRAIT[1] })];
+    if (search.skipped.length) {
+      notes.push(t('search.skipped', {
+        list: search.skipped.map(function (k) { return k + '×'; }).join(', '),
+        mp: Math.round(Search.MAX_PIXELS / 1e6),      // 英語は megapixel
+        man: Math.round(Search.MAX_PIXELS / 1e4)      // 日本語は万画素
+      }));
+    }
+    $('search-note').textContent = notes.join('　');
+    $('search-note').hidden = false;
+
+    showAllResults();
+    $('search-all').hidden = false;
+  }
+
+  function cardHtml(c, i) {
+    var r = c.r;
+    return '<div class="pick">'
+      + '<h3>' + c.roles.map(function (k) { return t(k); }).join(' / ') + '</h3>'
+      + '<p class="pick-set">' + t('pick.set', { k: r.scale, lv: r.level,
+                                                 dpi: r.dpi, w: r.W, h: r.H }) + '</p>'
+      + c.roles.map(function (k) {
+          return '<p class="pick-why">' + reasonFor(k, r) + '</p>';
+        }).join('')
+      + '<p class="pick-size">' + t('pick.size', {
+          kb: r.kb.toFixed(0), f: toKb(r.bytes.fset),
+          f3: toKb(r.bytes.fset3), i: toKb(r.bytes.iset) }) + '</p>'
+      + '<p class="hint">' + t('pick.profileNote') + '</p>'
+      + profileHtml(r)
+      + '<p class="row pick-actions">'
+      + '<button type="button" data-card="' + i + '" data-act="use">' + t('btn.use') + '</button>'
+      + ['fset', 'fset3', 'iset'].map(function (ext) {
+          return '<button type="button" data-card="' + i + '" data-act="' + ext + '">▼ .'
+            + ext + '</button>';
+        }).join('')
+      + '</p>'
+      + '<p class="hint applied" hidden></p>'
+      + '</div>';
+  }
+
+  /**
+   * なぜその設定が選ばれたのかを1行で書く。
+   * **数字はすべてこの画像で実際に測った値**。一般論は書かない。
+   */
+  function reasonFor(role, r) {
+    var p = search.picks, n = Search.FILL.length;
+    if (role === 'pick.best') {
+      return t('why.best', { c: r.coverage, n: n, s: pct(r.spread),
+                             tried: search.results.length });
+    }
+    if (role === 'pick.balanced') {
+      if (r === p.best) return t('why.balanced.same');
+      var same = pct(r.spread) === pct(p.best.spread);
+      return t(same ? 'why.balanced.eq' : 'why.balanced', {
+        c: r.coverage, n: n, s: pct(r.spread), s2: pct(p.best.spread),
+        d: Math.round(p.best.kb - r.kb) });
+    }
+    // pick.small
+    if (r === p.balanced) return t('why.small.same');
+    if (r.coverage === p.balanced.coverage) {
+      return t('why.small.eq', { c: r.coverage, n: n, s: pct(r.spread),
+                                 s2: pct(p.balanced.spread),
+                                 d: Math.round(p.balanced.kb - r.kb) });
+    }
+    return t('why.small', { c: r.coverage, n: n,
+                            d: Math.round(p.balanced.kb - r.kb) });
+  }
+
+  /** 「マーカーが画面幅の何割を占めるか」ごとの追従点。3点未満は追従が止まる */
+  function profileHtml(r) {
+    return '<div class="profile">' + r.profile.map(function (q) {
+      return '<span class="' + (q.points >= Engine.TRACK_MIN ? 'v-good' : 'v-bad') + '">'
+        + '<b>' + q.points + '</b><i>' + Math.round(q.fill * 100) + '%</i></span>';
+    }).join('') + '</div>';
+  }
+
+  /** 試したものを全部出す。黙って切り捨てない */
+  function showAllResults() {
+    var p = search.picks;
+    var rows = search.results.slice().sort(function (a, b) {
+      return Search.better(a, b) || (a.kb - b.kb);
+    });
+    $('search-table').querySelector('tbody').innerHTML = rows.map(function (r) {
+      var roles = [];
+      if (r === p.best) roles.push(t('pick.best'));
+      if (r === p.balanced) roles.push(t('pick.balanced'));
+      if (r === p.small) roles.push(t('pick.small'));
+      return '<tr class="' + (roles.length ? 'used' : '') + '">'
+        + '<td>' + r.scale + '×</td>'
+        + '<td>' + r.level + '</td>'
+        + '<td>' + r.dpi + '</td>'
+        + '<td>' + r.W + '×' + r.H + '</td>'
+        + '<td>' + r.coverage + '/' + Search.FILL.length + '</td>'
+        + '<td>' + r.points.map(function (v) {
+            return '<span class="' + (v >= Engine.TRACK_MIN ? '' : 'v-bad') + '">'
+              + v + '</span>';
+          }).join(' ') + '</td>'
+        + '<td>' + pct(r.spread) + '%</td>'
+        + '<td>' + r.kb.toFixed(0) + ' KB'
+        + (roles.length ? ' <span class="tag">' + roles.join(' / ') + '</span>' : '')
+        + '</td></tr>';
+    }).join('');
+  }
+
+  // 札のボタンは後から作るので、まとめて受ける
+  $('picks').addEventListener('click', function (e) {
+    var b = e.target.closest ? e.target.closest('button[data-act]') : null;
+    if (!b || !search.cards) return;
+    var card = search.cards[+b.dataset.card];
+    if (!card) return;
+    if (b.dataset.act === 'use') applyPick(card, b);
+    else Generator.download(card.r.files[b.dataset.act],
+                            fileBase() + '.' + b.dataset.act);
+  });
+
+  function fileBase() {
+    return ($('name').value || state.name || 'marker').replace(/[^\w.-]/g, '_');
+  }
+
+  /**
+   * おすすめの設定を実際に反映する。
+   * 拡大は**必ず元画像から**やる（作業中の画像から拡大すると倍率が掛け算になる）。
+   */
+  function applyPick(card, btn) {
+    var r = card.r, o = state.orig;
+    var up = Search.upscale(o.rgba, o.W, o.H, r.scale);
+    state.rgba = up.rgba; state.W = up.W; state.H = up.H;
+    state.scale = r.scale;
+    state.result = null;
+    state.detect = null;
+    $('level').value = r.level;
+    showImage();            // プレビューと画素数を描き直し、dpi を実寸から入れ直す
+    // 生成に使った dpi をそのまま入れる（実寸からの計算と一致するはずだが、
+    // 一致させること自体が大事なので明示的に入れ直す）
+    $('dpi').value = r.dpi;
+
+    Array.prototype.forEach.call($('picks').querySelectorAll('.applied'), function (el) {
+      el.hidden = true;
+    });
+    var note = btn.closest('.pick').querySelector('.applied');
+    note.textContent = t('pick.applied', { k: r.scale });
+    note.hidden = false;
+  }
+
+  // ------------------------------------------------------------------
+  // 4. 予測を走らせる
   // ------------------------------------------------------------------
   var worker = null;
 
@@ -213,7 +487,7 @@
   });
 
   // ------------------------------------------------------------------
-  // 4. 判定を表示する
+  // 5. 判定を表示する
   // ------------------------------------------------------------------
   function vClass(n) {
     return n >= Engine.GOOD ? 'v-good' : (n >= Engine.POOR ? 'v-mid' : 'v-bad');
@@ -320,7 +594,7 @@
   }
 
   // ------------------------------------------------------------------
-  // 4-b. 使える距離
+  // 5-b. 使える距離
   // ------------------------------------------------------------------
   var DISTANCES_MM = [200, 300, 400, 500, 750, 1000, 1500, 2000, 3000];
 
@@ -382,7 +656,7 @@
   }
 
   // ------------------------------------------------------------------
-  // 5. 生成
+  // 6. 生成
   // ------------------------------------------------------------------
   $('gen').addEventListener('click', function () {
     if (!state.rgba) return;
@@ -424,6 +698,7 @@
   // 言語を切り替えたら、動的に組み立てた部分も描き直す
   self.onI18nChange = function () {
     if (state.rgba) showImage();
+    if (search.picks) showPicks();
     if (state.result) showResult();
   };
 

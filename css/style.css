@@ -122,16 +122,48 @@ button[disabled] { opacity: 0.45; cursor: default; }
 table { width: 100%; border-collapse: collapse; margin: 1rem 0 0.6rem; }
 caption { text-align: left; color: var(--muted); font-size: 0.86em; padding-bottom: 0.5rem; }
 th, td { text-align: right; padding: 0.16rem 0.6rem; border-bottom: 1px solid var(--line); }
-th:last-child, td:last-child { text-align: left; width: 46%; }
+/* 最後の列を「棒グラフや但し書きを置く広い列」として扱うのは、この2つの表だけ。
+   全部の table に掛けると、普通の列を持つ表（#search-table）まで巻き添えになる */
+#bands th:last-child, #bands td:last-child,
+#dist th:last-child, #dist td:last-child {
+  text-align: left; width: 46%; white-space: nowrap;
+}
 th { color: var(--muted); font-weight: normal; }
 tr.used { background: var(--panel); }
 tr.used td:first-child::after { content: " ←"; }
-td:last-child { white-space: nowrap; }
 .bar {
   display: inline-block; height: 0.7em; max-width: 62%;
   background: var(--accent); vertical-align: middle;
 }
 .tag { color: var(--muted); font-size: 0.84em; margin-left: 0.5rem; }
+
+/* --- おすすめ3案 --- */
+.picks {
+  display: grid; grid-template-columns: repeat(auto-fit, minmax(310px, 1fr));
+  gap: 1.2rem; margin-top: 1.2rem;
+}
+.pick { border: 1px solid var(--line); padding: 0.9rem 1rem 1rem; }
+.pick h3 { font-size: 0.94rem; margin: 0 0 0.35rem; letter-spacing: 0.06em; }
+.pick-set { margin: 0 0 0.5rem; color: var(--accent); }
+.pick-why { margin: 0 0 0.25rem; padding-left: 1.2rem; font-size: 0.9em; }
+.pick-why::before { content: "└ "; color: var(--muted); margin-left: -1.2rem; }
+.pick-size { margin: 0.7rem 0 0.6rem; }
+.pick p.hint { margin: 0; }
+
+/* 距離ごとの追従点。数字を大きく、その下に「画面幅の何割か」を小さく */
+.profile { display: flex; gap: 0.75rem; margin: 0.1rem 0 0.2rem; flex-wrap: wrap; }
+.profile span { text-align: center; }
+.profile b { display: block; font-size: 1.2rem; line-height: 1.2; }
+.profile i { display: block; font-style: normal; font-size: 0.78em; color: var(--muted); }
+
+.pick-actions { margin: 0.8rem 0 0; gap: 0.35rem; }
+.pick-actions button { padding: 0.18rem 0.6rem; font-size: 0.86em; }
+.pick .applied { margin: 0.6rem 0 0; }
+
+/* 8列あるので、狭い画面では表だけ横スクロールさせる（本文は折り返す） */
+.tablewrap { overflow-x: auto; }
+#search-table { min-width: 44rem; }
+#search-table td, #search-table th { white-space: nowrap; }
 
 /* --- ヒートマップ --- */
 .panels { display: grid; grid-template-columns: repeat(auto-fit, minmax(300px, 1fr)); gap: 1.4rem; }
@@ -152,5 +184,8 @@ footer a { margin-right: 1.2rem; }
 
 @media (max-width: 640px) {
   body { font-size: 13px; }
-  th:last-child, td:last-child { display: none; }
+  /* 棒グラフの列だけを落とす。中身のある列を消してはいけない */
+  #bands th:last-child, #bands td:last-child,
+  #dist th:last-child, #dist td:last-child { display: none; }
+  .picks { grid-template-columns: 1fr; }
 }

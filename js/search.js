@@ -32,6 +32,28 @@
   // 判定に使う「マーカーが画面に占める割合」。1.0 = 見えている幅いっぱい。
   var FILL = [1.0, 0.85, 0.7, 0.55, 0.45, 0.35];
 
+  // 散らばりの許容幅（マーカー面積に対する割合）。
+  // 実測は 1% = 大小に飛ぶ / 17% = ほぼ安定 / 33% = 安定 の3点しかない。
+  // これより細かい分解能は持っていないので、5ポイント未満の差は同じとみなす。
+  // 実測どうしの間隔（16ポイント）より十分小さいので、区別できると分かっている
+  // 状態どうしを取り違えることはない。
+  var SPREAD_STEP = 0.05;
+
+  // ファイルサイズの許容幅（KB）。1KB の差で中身の悪い方を選ぶ失敗をしたので入れた。
+  var KB_STEP = 10;
+
+  // 拡大後の画素数の上限。6倍は画素数が36倍になるので、大きい絵をそのまま
+  // 掛けるとブラウザが落ちる（1600x1200 の6倍で 1.4GB の確保になる）。
+  // 1600万画素 = RGBA で 64MB。ここで切って、切ったことは呼び出し側から見えるようにする。
+  var MAX_PIXELS = 16e6;
+
+  /** その画像で実際に試せる拡大率だけを返す（大きすぎるものは落とす） */
+  function usableScales(W, H, scales) {
+    return (scales || SCALES).filter(function (k) {
+      return W * k * H * k <= MAX_PIXELS;
+    });
+  }
+
   /** ニアレストネイバーで整数倍に拡大する（なめらかにしてはいけない） */
   function upscale(rgba, W, H, k) {
     if (k === 1) return { rgba: rgba, W: W, H: H };
@@ -98,7 +120,7 @@
   function search(rgba, W, H, opts) {
     var wMm = opts.wMm, hMm = opts.hMm;
     var region = opts.region || Engine.REGION_PORTRAIT;
-    var scales = opts.scales || SCALES;
+    var scales = usableScales(W, H, opts.scales);
     var levels = opts.levels || LEVELS;
     var results = [], total = scales.length * levels.length, done = 0;
 
@@ -111,8 +133,10 @@
         chain = chain.then(function () {
           if (!cache[k]) cache[k] = upscale(rgba, W, H, k);
           var img = cache[k];
-          // 実寸を変えないために dpi も同じ倍率で上げる
-          var dpi = Math.round(img.W / (wMm / 25.4));
+          // 実寸を変えないために dpi も同じ倍率で上げる。
+          // 整数に丸めない。画面の入力欄は小数2桁で dpi を出すので、丸めると
+          // 「おすすめを適用したのに、生成に使った dpi と欄の数字が違う」ことになる
+          var dpi = +(img.W / (wMm / 25.4)).toFixed(2);
           return Generator.generate(img.rgba.slice(), img.W, img.H, {
             dpi: dpi, level: lv, leveli: opts.leveli,
             name: 'tempFilename.png', quiet: true
@@ -159,45 +183,65 @@
    * 実際に使うのは1つの帯だけ。実測では合計92点の設定が、合計38点の設定に
    * どの距離でも負けていた。**困るのは調子が悪いときなので、最悪値で比べる。**
    */
+  /**
+   * 品質の順。**画面の並べ替えもこれを使う**（UI 側に書き直すと必ずずれる）。
+   *   1. 使える距離の数（3点未満は追従が止まるので、ここが崖）
+   *   2. その中でいちばん散らばりが小さいところ（姿勢の決まりやすさ）
+   *   3. 合計点数（ここまで並んだときの最後の拠り所。これ単独では使わない）
+   */
+  function better(a, b) {
+    return (b.coverage - a.coverage) || (b.spread - a.spread) || (b.sum - a.sum);
+  }
+
+  /**
+   * 候補の中から、いちばん小さいものと**同じ大きさとみなせる**範囲を取り、
+   * その中で中身のいちばん良いものを返す。
+   *
+   * 刻んだ値（Math.round(kb/10) など）で比べてはいけない。格子の境目が恣意的で、
+   * 104KB と 105KB が「別の大きさ」に、100KB と 104KB が「同じ大きさ」になる。
+   * 基準を「いちばん小さいもの」に取れば境目は動かない。
+   */
+  function smallestOf(cands) {
+    var min = cands.reduce(function (m, r) { return r.kb < m ? r.kb : m; }, Infinity);
+    return cands.filter(function (r) { return r.kb <= min + KB_STEP; })
+                .sort(function (a, b) { return better(a, b) || (a.kb - b.kb); })[0];
+  }
+
   function pick(results) {
     if (!results.length) return null;
 
-    // ファイルサイズは 10KB 刻みで比べる。1KB の差で中身の悪い方を選ばないように。
-    function bucket(kb) { return Math.round(kb / 10); }
-
-    // 品質の順。
-    //   1. 使える距離の数（3点未満は追従が止まるので、ここが崖）
-    //   2. その中でいちばん散らばりが小さいところ（姿勢の決まりやすさ）
-    //   3. 合計点数
-    function better(a, b) {
-      return (b.coverage - a.coverage) || (b.spread - a.spread) || (b.sum - a.sum);
-    }
+    // 性能重視。サイズを一切見ないので、細かい差もそのまま拾ってよい。
     var best = results.slice().sort(function (a, b) {
       return better(a, b) || (a.kb - b.kb);
     })[0];
 
-    // 品質を落とさずに、いちばん小さいもの
+    // バランス。**品質を落とさずに**いちばん小さいもの。
+    // 散らばりの許容幅が要る。**持っている根拠は 1% / 17% / 33% の3点だけ**なので、
+    // それより細かい差を「良い」と読むのは、測っていないことを測ったことにする行為。
+    // これが無いと 1.7% と 1.5% の差で 291KB 大きい方が選ばれ、
+    // バランス案が性能案と同じものになってしまう（実際に起きた）。
     var tied = results.filter(function (r) {
-      return r.coverage === best.coverage && r.spread >= best.spread * 0.9;
+      return r.coverage === best.coverage && r.spread >= best.spread - SPREAD_STEP;
     });
-    var balanced = tied.slice().sort(function (a, b) {
-      return (bucket(a.kb) - bucket(b.kb)) || better(a, b) || (a.kb - b.kb);
-    })[0];
+    var balanced = smallestOf(tied);
 
-    // 使える距離が1つ減ってもいいから小さいもの。
-    // **同じくらいの大きさなら中身の良い方**を採る（10KB 刻みで比べる理由）
+    // サイズ重視。使える距離が1つ減ってもいいから小さいもの。
     var lower = results.filter(function (r) {
       return r.coverage >= Math.max(1, best.coverage - 1);
     });
-    var small = (lower.length ? lower : results).slice().sort(function (a, b) {
-      return (bucket(a.kb) - bucket(b.kb)) || better(a, b) || (a.kb - b.kb);
-    })[0];
+    var small = smallestOf(lower.length ? lower : results);
+    // 候補が広い分だけ、同じ大きさの中でより中身の良い（＝わずかに大きい）ものを
+    // 引き当てることがある。バランス案より大きい「サイズ重視」は名前と食い違うので、
+    // そうなったらバランス案をそのまま返す（これ以上小さくできない、が正しい答え）
+    if (small.kb > balanced.kb) small = balanced;
 
     return { best: best, balanced: balanced, small: small };
   }
 
   var API = { SCALES: SCALES, LEVELS: LEVELS, FILL: FILL,
-              upscale: upscale, score: score, search: search, pick: pick };
+              SPREAD_STEP: SPREAD_STEP, KB_STEP: KB_STEP, MAX_PIXELS: MAX_PIXELS,
+              upscale: upscale, usableScales: usableScales,
+              score: score, search: search, pick: pick, better: better };
   if (typeof module === 'object' && module.exports) module.exports = API;
   else root.Search = API;
 })(typeof self !== 'undefined' ? self : this);

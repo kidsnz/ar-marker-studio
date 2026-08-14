@@ -36,7 +36,7 @@ The thresholds below are not folklore. They come from reading `tracking.c` and
 | Fact | Source | What it means |
 |---|---|---|
 | **Tracking stops below 3 points** | `tracking.c`: `if(num < 3) return -3` | At exactly 3, one lost point ends it |
-| **Only 10 points are tried per frame** | `AR2_DEFAULT_SEARCH_FEATURE_NUM = 10` | 90 points still means 10 per frame. **Spread beats count** |
+| **Only 16 points are tried per frame** | the default `AR2_DEFAULT_SEARCH_FEATURE_NUM` is 10, but `setupAR2()` in `ARToolKitNFT_js.cpp` overrides it with `ar2SetSearchFeatureNum(16)` | 90 points still means 16 per frame. **Spread beats count** |
 | **Points in the outer 1/8 of the frame are never picked** | coordinate check in `ar2SelectTemplate` | Only bites when the band image is wider than ~176px |
 | **If a band is empty it retries `[mindpi/2, maxdpi*2]`** | `extractVisibleFeatures` | The strict band count is a little pessimistic |
 | **The band is chosen by the smaller of the two apparent dpi** | `ar2GetResolution2` puts the smaller in `dpi[1]`, and `w[1]` is what is tested | Confirms `min(width-based, height-based)` |
@@ -98,10 +98,16 @@ matter how many tracking points it has.
 There is deliberately **no "repetitive pattern" score**. The idea is sound — the matcher uses a
 ratio test (best/second-best < 0.7), so near-identical descriptors elsewhere in the image cancel
 each other out — but every marker to hand recognises fine, so there was no failing example to
-calibrate a threshold against. An attempt to manufacture one by feeding synthetic camera frames
-to the real detector did not work: even handing it the exact image the descriptors were built
-from, full frame, produced no detection (while the negative control behaved correctly). Rather
-than ship a number nobody can check, the tool reports the counts and stops there.
+calibrate a threshold against. Rather than ship a number nobody can check, the tool reports the
+counts and stops there.
+
+An earlier version of this section said that feeding synthetic camera frames to the real detector
+"did not work". **That was wrong: the fault was in the test harness, not in the approach.**
+Driving the same WASM detector ARnft uses with generated frames works, and costs a few
+milliseconds per condition. `tools/check_detection.py` in the website repo does exactly that —
+it shrinks the marker frame by frame to find the size at which detection stops, which is how far
+away it can be recognised from. What is still missing for a repetitive-pattern score is a marker
+that actually fails, not a way to test one.
 
 ## Why the total point count is meaningless
 
