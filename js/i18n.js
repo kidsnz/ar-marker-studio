@@ -202,6 +202,7 @@
 
     // --- フッター ---
     'foot.credit': '生成部分は <a href="https://github.com/Carnaux/NFT-Marker-Creator">Carnaux/NFT-Marker-Creator</a>（MIT）の成果物をそのまま使っている。'
+      + '見た目もそちらに倣った。緑、まだ押せないものの赤、点線の枠はすべてあのツールから受け継いだもの。'
       + '判定・ヒートマップは実際の生成器のログと突き合わせて検証した独自実装。',
     'foot.verify': '検算ページ',
     'foot.source': 'ソース',

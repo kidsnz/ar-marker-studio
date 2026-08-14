@@ -1,4 +1,15 @@
-/* AR Marker Studio — 等幅・モノクロ基調。ライト/ダークはOS設定に従う */
+/* AR Marker Studio — 等幅基調。ライト/ダークはOS設定に従う
+ *
+ * 配色と点線の枠は Carnaux/NFT-Marker-Creator から受け継いでいる。
+ * 向こうの共通言語はこの3つ:
+ *   緑 #42b983  … 進める側（Generate の枠と文字、有効なもの）
+ *   赤          … 進めない側（押せない Generate、消すボタン）
+ *   点線の枠＋角丸 … 画像を置く枠・プレビュー・Generate に共通で使う
+ *
+ * ただし #42b983 は白地でコントラストが 2.47 しかなく本文には使えないので、
+ * ライトでは文字用に濃い緑 #27795a（5.29）を使い、面と枠には元の緑を残す。
+ * ダークは #42b983 のままで 7.66 出る。
+ */
 
 :root {
   --bg: #ffffff;
@@ -6,10 +17,11 @@
   --muted: #6b7280;
   --line: #d8dbe0;
   --panel: #f6f7f9;
-  --accent: #0b6bcb;
-  --good: #12805c;
+  --accent: #27795a;        /* 文字・リンク用の緑（白地で 5.29） */
+  --accent-soft: #42b983;   /* 面・枠用。carnaux の緑そのもの */
+  --good: #27795a;
   --warn: #a8620a;
-  --bad: #b3261e;
+  --bad: #c0392b;
   --warn-bg: #fdf5e6;
 }
 @media (prefers-color-scheme: dark) {
@@ -19,10 +31,11 @@
     --muted: #8b949e;
     --line: #30363d;
     --panel: #161b22;
-    --accent: #58a6ff;
-    --good: #3fb950;
+    --accent: #42b983;      /* 暗地では carnaux の緑がそのまま使える（7.66） */
+    --accent-soft: #8dd5b4;
+    --good: #42b983;
     --warn: #d29922;
-    --bad: #f85149;
+    --bad: #e57e7e;
     --warn-bg: #221a08;
   }
 }
@@ -55,7 +68,6 @@ h1 { font-size: 1.35rem; letter-spacing: 0.18em; margin: 0 0 0.6rem; }
 
 section { padding: 2rem 0; border-bottom: 1px solid var(--line); }
 h2 { font-size: 1rem; margin: 0 0 1rem; letter-spacing: 0.06em; }
-h2::before { content: "── "; color: var(--muted); }
 
 a { color: var(--accent); }
 code { background: var(--panel); padding: 0 0.25em; }
@@ -64,7 +76,8 @@ code { background: var(--panel); padding: 0 0.25em; }
 
 /* --- 入力 --- */
 #drop {
-  border: 1px dashed var(--line);
+  border: 2px dashed var(--line);
+  border-radius: 5px;
   background: var(--panel);
   padding: 2.2rem 1rem;
   text-align: center;
@@ -75,7 +88,8 @@ code { background: var(--panel); padding: 0 0.25em; }
 
 #imginfo { display: flex; gap: 1.4rem; align-items: flex-start; margin-top: 1.2rem; flex-wrap: wrap; }
 #preview {
-  max-width: 220px; max-height: 220px; border: 1px solid var(--line);
+  max-width: 220px; max-height: 220px;
+  border: 2px dashed var(--line); border-radius: 5px;
   image-rendering: pixelated;
 }
 dl { margin: 0; display: grid; grid-template-columns: auto auto; gap: 0.1rem 1rem; }
@@ -99,9 +113,33 @@ input, select, button {
 input[type=number] { width: 8.5rem; }
 button { cursor: pointer; }
 button:hover { border-color: var(--accent); color: var(--accent); }
-button.primary { border-color: var(--fg); padding: 0.42rem 1.3rem; }
-button.primary:hover { background: var(--fg); color: var(--bg); }
 button[disabled] { opacity: 0.45; cursor: default; }
+
+/* 進める側は緑の点線、進めない側は赤。carnaux の generateButton と同じ約束 */
+button.primary {
+  border: 2px dashed var(--accent-soft); border-radius: 5px;
+  color: var(--accent); font-weight: bold; padding: 0.42rem 1.3rem;
+}
+button.primary:hover { background: var(--accent-soft); color: #fff; border-style: solid; }
+button.primary[disabled] {
+  opacity: 1; border-color: var(--bad); color: var(--bad); background: var(--bg);
+}
+
+/* Generate は大きなパネル。押せないあいだは赤い点線枠のまま（carnaux の初期状態） */
+.genrow { display: flex; gap: 1.6rem; align-items: stretch; flex-wrap: wrap; }
+.genfields { flex: 0 1 auto; }
+.genpanel {
+  flex: 0 0 240px; min-height: 150px;
+  border: 3px dashed var(--accent-soft); border-radius: 10px;
+  background: transparent; color: var(--accent);
+  font-size: 1.15rem; font-weight: bold; line-height: 1.4;
+  padding: 1rem;
+}
+.genpanel:hover { background: var(--accent-soft); color: #fff; border-style: solid; }
+.genpanel[disabled] {
+  opacity: 1; border-color: var(--bad); color: var(--bad);
+  background: transparent; pointer-events: none;
+}
 .preset { color: var(--muted); }
 .preset button { padding: 0.1rem 0.5rem; font-size: 0.86em; }
 
@@ -142,7 +180,7 @@ tr.used td:first-child::after { content: " ←"; }
   display: grid; grid-template-columns: repeat(auto-fit, minmax(310px, 1fr));
   gap: 1.2rem; margin-top: 1.2rem;
 }
-.pick { border: 1px solid var(--line); padding: 0.9rem 1rem 1rem; }
+.pick { border: 2px dashed var(--line); border-radius: 5px; padding: 0.9rem 1rem 1rem; }
 .pick h3 { font-size: 0.94rem; margin: 0 0 0.35rem; letter-spacing: 0.06em; }
 .pick-set { margin: 0 0 0.5rem; color: var(--accent); }
 .pick-why { margin: 0 0 0.25rem; padding-left: 1.2rem; font-size: 0.9em; }

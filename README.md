@@ -304,7 +304,13 @@ Both run in a Worker, so the page stays responsive.
 MIT. `vendor/` bundles, unmodified, a build artifact from
 [Carnaux/NFT-Marker-Creator](https://github.com/Carnaux/NFT-Marker-Creator) (MIT), which is
 itself an Emscripten build of ARToolKit5 (LGPL v3 with a linking exception). See
-[LICENSE](LICENSE). The quality engine, heatmaps and interface are original work.
+[LICENSE](LICENSE). The quality engine, the heatmaps and the interface are original work.
+
+**The visual design follows NFT-Marker-Creator on purpose**, out of respect for where this came
+from: the green for what you can do, the red for what you cannot press yet, and the dashed frames
+around anything you drop an image into or act on. Only the greens are adjusted — `#42b983` sits at
+2.5:1 on white, which is too low to read, so the light theme uses a deeper `#27795a` for text and
+keeps the original green for panels and borders.
 
 Related:
 - [Carnaux/NFT-Marker-Creator](https://github.com/Carnaux/NFT-Marker-Creator) (upstream)

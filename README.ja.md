@@ -282,6 +282,11 @@ Chrome / M系 Mac、320×320 の画像で:
 MIT。`vendor/` は [Carnaux/NFT-Marker-Creator](https://github.com/Carnaux/NFT-Marker-Creator)（MIT）の
 成果物をそのまま同梱している。判定・ヒートマップ・画面は独自実装。
 
+**見た目は意図して NFT-Marker-Creator に倣っている。** 出どころへの敬意として。
+できることの緑、まだ押せないものの赤、画像を置く枠や操作するものを囲む点線。
+変えたのは緑の階調だけで、`#42b983` は白地でのコントラストが 2.5 しかなく読めないため、
+ライトでは文字に濃い `#27795a` を使い、面と枠には元の緑を残している。
+
 元の生成ツールはこちら:
 - [Carnaux/NFT-Marker-Creator](https://github.com/Carnaux/NFT-Marker-Creator)（本家）
 - [kidsnz/NFT-Marker-Creator](https://github.com/kidsnz/NFT-Marker-Creator)（保全用のフォーク。本家と同一）
