@@ -24,10 +24,17 @@
 (function (root) {
   'use strict';
 
-  // 探す軸。ガイド第5章の実測で「効く」と確認できたものだけ。
+  // 探す軸は**拡大率だけ**。
+  //
   // -dpi は距離帯を動かすだけで点数を変えない（実測）ので探索に入れない。
+  // -level も振らない。**実測で振る意味が無いと分かったため**:
+  //   ・品質は level=4 が全条件で勝つ
+  //   ・ファイルサイズはほとんど動かない（同じ画像で level 4/3/0 が 83/83/83 KB）。
+  //     サイズを決めているのは .fset3 で、そこに -level は効かない
+  // 5通り試して1つも勝てない軸のために、かかる時間を5倍にしていた。
+  // ブラウザでの生成は 1920x1080 の等倍で 28.6 秒かかる。5倍は致命的だった。
   var SCALES = [1, 2, 3, 4, 6];
-  var LEVELS = [4, 2, 3, 1, 0];   // 実測で level=4 が全条件で勝ったので先に試す
+  var LEVELS = [4];
 
   // 判定に使う「マーカーが画面に占める割合」。1.0 = 見えている幅いっぱい。
   var FILL = [1.0, 0.85, 0.7, 0.55, 0.45, 0.35];
@@ -114,7 +121,11 @@
    * 総当たりで探す。結果は出た順に onResult で返す（待たせないため）。
    *
    * @param rgba,W,H 元画像
-   * @param opts {wMm, hMm, region, leveli, scales, levels, onResult(r), onProgress(done,total)}
+   * @param opts {wMm, hMm, region, leveli, scales, levels,
+   *              onResult(r), onProgress(done,total),
+   *              onStart(scale,level,i,total) いま何を生成し始めたか,
+   *              onLog(text) 生成器が吐く進捗（1通りに30秒かかることがあるので要る）,
+   *              stopped() true を返すとそこで打ち切る}
    * @returns {Promise<Array>} 全結果
    */
   function search(rgba, W, H, opts) {
@@ -131,6 +142,9 @@
     scales.forEach(function (k) {
       levels.forEach(function (lv) {
         chain = chain.then(function () {
+          // 中止されていたら、以降は何も生成しない（残りは黙って素通りする）
+          if (opts.stopped && opts.stopped()) return;
+          if (opts.onStart) opts.onStart(k, lv, done + 1, total);
           if (!cache[k]) cache[k] = upscale(rgba, W, H, k);
           var img = cache[k];
           // 実寸を変えないために dpi も同じ倍率で上げる。
@@ -139,7 +153,10 @@
           var dpi = +(img.W / (wMm / 25.4)).toFixed(2);
           return Generator.generate(img.rgba.slice(), img.W, img.H, {
             dpi: dpi, level: lv, leveli: opts.leveli,
-            name: 'tempFilename.png', quiet: true
+            name: 'tempFilename.png',
+            // 1通りに30秒かかることがあるので、生成器の進捗をそのまま外に流す。
+            // これが無いと「動いているのか止まっているのか」が分からない
+            quiet: !opts.onLog, onLog: opts.onLog
           }).then(function (g) {
             var parsed = FSet.parse(g.fset);
             var r = {

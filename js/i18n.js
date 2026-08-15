@@ -59,16 +59,25 @@
 
     // --- 3. 自動探索 ---
     'search.title': '3. おすすめの設定',
-    'search.hint': '拡大率と -level の組み合わせを<strong>実際に生成して</strong>比べる。'
-      + 'だから下に出る点数もファイルサイズも推定ではなく実測値。'
-      + 'ブラウザでの生成は 320×228 の画像で1通りあたり約4.5秒かかるので、'
-      + '25通り全部だと数分かかる。画像が大きいほど、拡大率が大きいほど遅くなる。',
+    'search.hint': '画像を入れると自動で始まる。拡大率ごとに<strong>実際に生成して</strong>比べるので、'
+      + '下に出る点数もファイルサイズも推定ではなく実測値。'
+      + '<code>-level</code> は 4 しか試さない。品質は毎回 level=4 が勝つうえ、'
+      + 'ファイルサイズもほとんど動かないため（サイズを決めているのは <code>.fset3</code> で、'
+      + 'そこに <code>-level</code> は効かない）。'
+      + '生成は遅い。実測で 320×228 が4.5秒、1920×1080 が28.6秒なので、大きい画像だと数分かかる。',
     'btn.search': '最適な設定を探す',
     'search.all': '試した組み合わせを全部見る',
     'search.progress': '生成して採点中… {i}/{n}',
     'search.took': '{n} 通りを {s} 秒で試した。以下の数字はすべて実測値（予測ではない）。',
     'search.none': '生成が1つも通らなかったので、おすすめが出せない。',
     'search.failed': '{n} 通りのうち {d} 通りは生成が通らなかったので除いてある。',
+    'search.doing': '{k}倍を生成中（{i}/{n}）… {s}秒',
+    'search.left': '残り およそ{t}',
+    'search.etaSec': '{s}秒',
+    'search.etaMin': '{m}分',
+    'search.stopped': '{total} 通りのうち {n} 通りで中止した。下のおすすめは、そこまでに出たものから選んでいる。',
+    'btn.stop': '中止',
+    'gen.blocked': 'いま探索が生成器を使っている。終わるまで待つか、上の「中止」を押す。',
     'search.skipped': '{list} は試していない。拡大すると {man}万画素を超えて'
       + 'ブラウザのメモリが足りなくなるため。',
     'search.region': '縦持ち（実効 {w}×{h}）で採点している。下の判定と同じ前提。',
@@ -98,17 +107,14 @@
     // --- 4. 判定 ---
     'step3.title': '4. 判定',
     'tbl.caption': '距離帯ごとの追従点。<strong>合計は当てにならない。実際に使う帯の点数だけを見る</strong>',
-    'tbl.range': '有効範囲 (dpi)',
     'tbl.px': '画素数',
     'tbl.pts': '点',
     'res.portrait': '縦持ち（使える {w}×{h}px）',
-    'res.landscape': '横持ち（使える {w}×{h}px）',
     'res.portrait.short': '縦持ち',
-    'res.landscape.short': '横持ち',
     'res.apparent': '見かけ {n} dpi →',
     'res.points': '点',
     'res.summary': '元画像 {w}×{h} / -dpi={dpi} / -level={level} → 実寸 {mw}×{mh} mm　　追従点の合計 {total} 点',
-    'res.usedBy': '{who}で使う',
+    'res.usedBy': 'この帯を使う',
     'verdict.stable': '安定',
     'verdict.marginal': '不足ぎみ',
     'verdict.limit': 'ギリギリ',
@@ -137,16 +143,15 @@
     // --- 5. 使える距離 ---
     'dist.title': '5. どこまで離れても効くか',
     'dist.col': '距離',
-    'dist.updpi': '縦持ちdpi',
     'dist.uppts': '点',
-    'dist.sidedpi': '横持ちdpi',
-    'dist.sidepts': '点',
     'dist.basis': 'ARnft 標準の camera_para.dat のカメラを前提にしている'
       + '（640×480、fx=609.4 なので長辺方向の画角 55.4度）。レンズが違えば距離が比例してずれる。'
       + '画面に収まる距離より近づくとマーカーがはみ出すので、そこの点数は過大評価になる。',
-    'dist.range': '{who}: {min} 〜 {max} で安定（{n}点以上）',
-    'dist.rangeMin': '{who}: {min} 〜 {max} で追従は成立する（{n}点以上）',
-    'dist.none': '{who}: どの距離でも {n} 点に届かない',
+    'dist.range': '{min} 〜 {max} で安定（{n}点以上）',
+    'dist.rangeMin': '{min} 〜 {max} で追従は成立する（{n}点以上）',
+    'dist.rangeOne': '{min} でだけ安定（{n}点以上）',
+    'dist.rangeOneMin': '{min} でだけ追従が成立する（{n}点以上）',
+    'dist.none': 'どの距離でも {n} 点に届かない',
     'dist.overflow': '画面からはみ出す',
     'dist.patchy': '点数は距離に対して滑らかに減らない（距離帯の重なり方が不規則なため）。'
       + 'これは最も長く連続している区間で、全部で {n} 区間に分かれている。',
@@ -191,8 +196,8 @@
     'det.note': '検出キーポイントは生成した .fset3 から読んだもの。0 の帯は、'
       + '追従点がいくらあってもその距離では<strong>そもそも認識できない</strong>。'
       + '「認識しない」と「認識するが揺れる」は別の問題。',
-    'det.summary': '{who}で使う帯の検出キーポイント {n} 点',
-    'det.none': '{who}で使う帯の検出キーポイントが0点。その距離では認識できない',
+    'det.summary': '実際に使う帯の検出キーポイント {n} 点',
+    'det.none': '実際に使う帯の検出キーポイントが0点。その距離では認識できない',
 
     // --- エラー ---
     'err.image': '画像を読めなかった: {m}',

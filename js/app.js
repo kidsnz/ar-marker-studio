@@ -27,6 +27,11 @@
     'search.took': 'Tried {n} combinations in {s}s. Every number below is measured, not predicted.',
     'search.none': 'Nothing could be generated, so there is nothing to recommend.',
     'search.failed': '{d} of the {n} could not be generated and are left out.',
+    'search.doing': 'Generating {k}\u00d7 ({i}/{n})\u2026 {s}s',
+    'search.left': 'about {t} left',
+    'search.etaSec': '{s}s',
+    'search.etaMin': '{m} min',
+    'search.stopped': 'Stopped after {n} of {total}. The recommendations below use what was finished.',
     'search.skipped': 'Not tried: {list}, because upscaling would push the image past '
       + '{mp} megapixels and the browser would run out of memory.',
     'search.region': 'Scored for a phone held upright ({w}×{h} effective), the same basis as the verdict below.',
@@ -48,14 +53,12 @@
       + 'The three files are generated already, so the buttons above download them as they are.',
 
     'res.portrait': 'Held upright ({w}×{h}px usable)',
-    'res.landscape': 'Held sideways ({w}×{h}px usable)',
     'res.portrait.short': 'upright',
-    'res.landscape.short': 'sideways',
     'res.apparent': 'apparent {n} dpi →',
     'res.points': 'points',
     'res.summary': 'Source {w}×{h} / -dpi={dpi} / -level={level} → printed {mw}×{mh} mm'
       + '  /  {total} tracking points in total',
-    'res.usedBy': 'used when held {who}',
+    'res.usedBy': 'this is the band actually used',
     'verdict.stable': 'stable',
     'verdict.marginal': 'marginal',
     'verdict.limit': 'on the edge',
@@ -95,11 +98,13 @@
     'det.note': 'Detection keypoints come from the generated .fset3. A band with 0 cannot be '
       + 'recognised at all at that distance, no matter how many tracking points it has. '
       + '"It never recognises" and "it recognises but wobbles" are different problems.',
-    'det.summary': 'Detection keypoints in the band used {who}: {n}',
-    'det.none': 'Detection keypoints in the band used {who}: none, so it cannot be recognised there',
-    'dist.range': '{who}: stable between {min} and {max} ({n}+ points)',
-    'dist.rangeMin': '{who}: tracks at all between {min} and {max} ({n}+ points)',
-    'dist.none': '{who}: never reaches {n} points at any distance',
+    'det.summary': 'Detection keypoints in the band actually used: {n}',
+    'det.none': 'The band actually used has no detection keypoints, so it cannot be recognised there',
+    'dist.range': 'Stable between {min} and {max} ({n}+ points)',
+    'dist.rangeMin': 'Tracks at all between {min} and {max} ({n}+ points)',
+    'dist.rangeOne': 'Stable only at {min} ({n}+ points)',
+    'dist.rangeOneMin': 'Tracks at all only at {min} ({n}+ points)',
+    'dist.none': 'Never reaches {n} points at any distance',
     'dist.overflow': 'marker runs off the frame',
     'dist.patchy': 'The count does not fall off smoothly with distance, because the bands '
       + 'overlap unevenly. This is the longest continuous stretch; there are {n} separate '
@@ -153,6 +158,9 @@
       state.detect = null;              // 画像を変えたら前の検出結果は捨てる
       clearSearch();                    // 前の画像で探した結果も捨てる
       showImage();
+      // 画像が入ったら、判定 → 最適設定の探索まで自動で走らせる。
+      // 押させる意味が無いし、探索は時間がかかるので少しでも早く始めたい
+      runPredict(true);
     }).catch(function (err) {
       alert(t('err.image', { m: err.message }));
     });
@@ -226,22 +234,38 @@
   // しかも正確な点数とファイルサイズが同時に手に入る。
   // 拡大の元は必ず state.orig（読み込んだそのままの画像）を使う。
   // ------------------------------------------------------------------
-  var search = { results: null, picks: null, cards: null, skipped: [] };
+  var search = { results: null, picks: null, cards: null, skipped: [],
+                 running: false, stop: false, left: null };
 
   function clearSearch() {
-    search = { results: null, picks: null, cards: null, skipped: [] };
+    search = { results: null, picks: null, cards: null, skipped: [],
+               running: false, stop: false, left: null };
     $('picks').innerHTML = '';
     $('picks').hidden = true;
     $('search-note').hidden = true;
     $('search-all').hidden = true;
+    $('search-stop').hidden = true;
     $('search-progress').textContent = '';
   }
 
   function pct(x) { return (x * 100).toFixed(1); }
   function toKb(bytes) { return (bytes / 1024).toFixed(1); }
 
-  $('search-run').addEventListener('click', function () {
-    if (!state.orig) return;
+  $('search-run').addEventListener('click', function () { runSearch(); });
+  $('search-stop').addEventListener('click', function () {
+    search.stop = true;
+    $('search-stop').disabled = true;
+  });
+
+  /** 「あと何分」を、いま測った時間だけから出す。モデルは持たない */
+  function eta(msLeft) {
+    var s = Math.round(msLeft / 1000);
+    return s >= 60 ? t('search.etaMin', { m: Math.ceil(s / 60) })
+                   : t('search.etaSec', { s: s });
+  }
+
+  function runSearch() {
+    if (!state.orig || search.running) return;
     var mm = parseFloat($('size-mm').value);
     if (!(mm > 0)) { alert(t('err.dpi')); return; }
 
@@ -253,37 +277,80 @@
 
     clearSearch();
     search.skipped = skipped;
+    search.running = true;
+    search.stop = false;
     $('search-run').disabled = true;
-    $('gen').disabled = true;        // 生成ワーカーは1つしかないので取り合わせない
-    $('search-progress').textContent = t('search.progress', { i: 0, n: total });
+    $('search-stop').disabled = false;
+    $('search-stop').hidden = false;
+    // 生成ワーカーは1つしかないので取り合わせない。押せない理由は画面に出す
+    $('gen').disabled = true;
+    $('gen-blocked').hidden = false;
 
-    var t0 = Date.now();
+    // 1通りに30秒以上かかることがある（1920x1080 の等倍で実測 28.6秒）。
+    // n/N だけでは止まって見えるので、いま何を生成しているか・経過・見込みを出す
+    var t0 = Date.now(), curStart = t0, cur = null, perScale = {}, ticker = null;
+
+    function paint(extra) {
+      if (!cur) return;
+      var el = Math.round((Date.now() - curStart) / 1000);
+      var line = t('search.doing', { k: cur.k, i: cur.i, n: cur.n, s: el });
+      // 1通り終わっていれば、そこから残りの見込みが出せる
+      if (search.left != null) line += '　' + t('search.left', { t: eta(search.left) });
+      if (extra) line += '　' + extra;
+      $('search-progress').textContent = line;
+    }
+
     Search.search(o.rgba, o.W, o.H, {
       wMm: mm, hMm: hMm,
       leveli: parseInt($('leveli').value, 10),
       scales: scales,
-      onProgress: function (done, n) {
-        $('search-progress').textContent = t('search.progress', { i: done, n: n });
+      stopped: function () { return search.stop; },
+      onStart: function (k, lv, i, n) {
+        cur = { k: k, i: i, n: n };
+        curStart = Date.now();
+        paint();
+        if (!ticker) ticker = setInterval(paint, 1000);
+      },
+      onLog: function (line) { paint(line.slice(0, 60)); },
+      onProgress: function (done) {
+        // 残りの見込みを、済んだ倍率の実測から出す。
+        // **単純平均にしてはいけない。** 拡大率が上がると画素数は2乗で増えるので、
+        // 1倍の実測をそのまま当てると2倍を4分の1に見積もってしまう。
+        // 生成時間は画素数に比例もしない。実測2点
+        //   72,960px → 4.4秒 ／ 2,073,600px → 28.6秒
+        // から log(6.5)/log(28.4) = 0.56 乗で伸びる。丸めて 0.6 を使う
+        if (cur) perScale[cur.k] = (Date.now() - curStart) / Math.pow(cur.k * cur.k, 0.6);
+        var per = Object.keys(perScale).map(function (k) { return perScale[k]; });
+        var unit = per.reduce(function (a, b) { return a + b; }, 0) / per.length;
+        search.left = scales.slice(done).reduce(function (sum, k) {
+          return sum + unit * Math.pow(k * k, 0.6);
+        }, 0);
       }
     }).then(function (results) {
-      var msg = t('search.took', {
-        n: results.length, s: ((Date.now() - t0) / 1000).toFixed(1) });
+      var msg = search.stop
+        ? t('search.stopped', { n: results.length, total: total })
+        : t('search.took', { n: results.length,
+                             s: ((Date.now() - t0) / 1000).toFixed(1) });
       // 生成が通らなかったものがあれば黙って落とさず、いくつ落ちたか言う
-      if (results.length < total) {
+      if (!search.stop && results.length < total) {
         msg += '　' + t('search.failed', { d: total - results.length, n: total });
       }
       $('search-progress').textContent = msg;
       search.results = results;
-      search.picks = Search.pick(results);
+      search.picks = Search.pick(results);   // 途中で止めても、出た分から選ぶ
       showPicks();
     }).catch(function (err) {
       $('search-progress').textContent = '';
       alert(t('err.gen', { m: err.message }));
     }).then(function () {
+      if (ticker) clearInterval(ticker);
+      search.running = false;
       $('search-run').disabled = false;
+      $('search-stop').hidden = true;
       $('gen').disabled = false;
+      $('gen-blocked').hidden = true;
     });
-  });
+  }
 
   function showPicks() {
     var p = search.picks;
@@ -449,6 +516,7 @@
     var note = btn.closest('.pick').querySelector('.applied');
     note.textContent = t('pick.applied', { k: r.scale });
     note.hidden = false;
+    runPredict(false);      // 反映した設定での判定をそのまま見せる
   }
 
   // ------------------------------------------------------------------
@@ -456,7 +524,13 @@
   // ------------------------------------------------------------------
   var worker = null;
 
-  $('run').addEventListener('click', function () {
+  $('run').addEventListener('click', function () { runPredict(); });
+
+  /**
+   * 品質判定（予測）を走らせる。
+   * @param andSearch true なら、終わったあと続けて最適設定の探索まで自動で始める
+   */
+  function runPredict(andSearch) {
     if (!state.rgba) return;
     var dpi = parseFloat($('dpi').value), level = parseInt($('level').value, 10);
     if (!(dpi > 0)) { alert(t('err.dpi')); return; }
@@ -478,6 +552,8 @@
         $('run').disabled = false;
         state.result = m.result;
         showResult();
+        // 画像を入れたときは、判定に続けて探索まで自動で走らせる
+        if (andSearch) runSearch();
       } else if (m.type === 'error') {
         $('progress').textContent = '';
         $('run').disabled = false;
@@ -487,7 +563,7 @@
     // bw はコピーせず所有権ごと渡す（元は使い終わっている）
     worker.postMessage({ bw: bw, W: state.W, H: state.H, dpi: dpi, level: level },
                        [bw.buffer]);
-  });
+  }
 
   // ------------------------------------------------------------------
   // 5. 判定を表示する
@@ -509,7 +585,6 @@
         mw: ev.widthMm.toFixed(0), mh: ev.heightMm.toFixed(0), total: ev.total
       }) + '</p>'
       + verdictRow('res.portrait', Engine.REGION_PORTRAIT, ev.portrait)
-      + verdictRow('res.landscape', Engine.REGION_LANDSCAPE, ev.landscape)
       + '<p class="warn">' + t('res.provisional', { good: Engine.GOOD, poor: Engine.POOR,
                                                     floor: Engine.TRACK_MIN }) + '</p>'
       + '<p class="hint">' + t('res.spreadNote') + '</p>';
@@ -517,14 +592,11 @@
     var max = Math.max.apply(null, r.bands.map(function (b) { return b.points.length; })) || 1;
     var tb = $('bands').querySelector('tbody');
     tb.innerHTML = r.bands.map(function (b, i) {
-      var used = [];
-      if (b.mindpi <= ev.portrait.dpi && ev.portrait.dpi <= b.maxdpi) used.push(t('res.portrait.short'));
-      if (b.mindpi <= ev.landscape.dpi && ev.landscape.dpi <= b.maxdpi) used.push(t('res.landscape.short'));
+      // 実際に使う帯かどうかだけ印を付ける（縦持ちで判定する）
+      var used = b.mindpi <= ev.portrait.dpi && ev.portrait.dpi <= b.maxdpi;
       var det = state.detect && state.detect.levels[i];
-      return '<tr class="' + (used.length ? 'used' : '') + '">'
+      return '<tr class="' + (used ? 'used' : '') + '">'
         + '<td>' + i + '</td>'
-        + '<td>' + t('tbl.rangeFmt', { min: b.mindpi.toFixed(1),
-                                        max: b.maxdpi.toFixed(1) }) + '</td>'
         + '<td>' + b.W + '×' + b.H + '</td>'
         + '<td>' + b.points.length + '</td>'
         + (state.detect
@@ -532,8 +604,7 @@
               + (det ? det.count : '-') + '</td>'
             : '')
         + '<td><span class="bar" style="width:' + (b.points.length / max * 100) + '%"></span>'
-        + (used.length ? '<span class="tag">'
-            + t('res.usedBy', { who: used.join(' / ') }) + '</span>' : '')
+        + (used ? '<span class="tag">' + t('res.usedBy') + '</span>' : '')
         + '</td></tr>';
     }).join('');
 
@@ -551,16 +622,13 @@
 
     $('basis').textContent = t('res.basis');
     if (state.detect) {
-      var extra = [['res.portrait.short', ev.portrait], ['res.landscape.short', ev.landscape]]
-        .map(function (e) {
-          var n = 0;
-          r.bands.forEach(function (b, i) {
-            var d = state.detect.levels[i];
-            if (d && b.mindpi <= e[1].dpi && e[1].dpi <= b.maxdpi) n += d.count;
-          });
-          return t(n ? 'det.summary' : 'det.none', { who: t(e[0]), n: n });
-        }).join(' / ');
-      $('basis').textContent += '  ' + extra + '  ' + t('det.note');
+      var n = 0;
+      r.bands.forEach(function (b, i) {
+        var d = state.detect.levels[i];
+        if (d && b.mindpi <= ev.portrait.dpi && ev.portrait.dpi <= b.maxdpi) n += d.count;
+      });
+      $('basis').textContent += '  ' + t(n ? 'det.summary' : 'det.none', { n: n })
+                              + '  ' + t('det.note');
     }
 
     var sel = $('band');
@@ -602,7 +670,7 @@
   // ------------------------------------------------------------------
   // 5-b. 使える距離
   // ------------------------------------------------------------------
-  var DISTANCES_MM = [200, 300, 400, 500, 750, 1000, 1500, 2000, 3000];
+  var DISTANCES_MM = [300, 500, 1000, 1500, 2000];
 
   function fmtMm(mm) {
     return mm >= 1000 ? (mm / 1000).toFixed(mm % 1000 ? 1 : 0) + 'm'
@@ -613,22 +681,21 @@
     var r = state.result;
     var wMm = ev.widthMm, hMm = ev.heightMm;
     var pt = Engine.distanceTable(r.bands, Engine.REGION_PORTRAIT, wMm, hMm, DISTANCES_MM);
-    var ls = Engine.distanceTable(r.bands, Engine.REGION_LANDSCAPE, wMm, hMm, DISTANCES_MM);
 
     $('dist-summary').innerHTML = [
-      ['res.portrait.short', Engine.REGION_PORTRAIT],
-      ['res.landscape.short', Engine.REGION_LANDSCAPE]
+      [Engine.REGION_PORTRAIT]
     ].map(function (e) {
-      var who = t(e[0]);
-      var good = Engine.usableRange(r.bands, e[1], wMm, hMm, Engine.GOOD);
-      var any = Engine.usableRange(r.bands, e[1], wMm, hMm, Engine.TRACK_MIN);
+      var good = Engine.usableRange(r.bands, e[0], wMm, hMm, Engine.GOOD);
+      var any = Engine.usableRange(r.bands, e[0], wMm, hMm, Engine.TRACK_MIN);
       var use = good || any, key = good ? 'dist.range' : 'dist.rangeMin';
+      // 幅が無いときに「52cm 〜 52cm」と出ると壊れて見える
+      if (use && use.min === use.max) key = good ? 'dist.rangeOne' : 'dist.rangeOneMin';
       var cls = good ? 'v-good' : 'v-mid';
       if (!use) {
-        return '<div class="v-bad">' + t('dist.none', { who: who, n: Engine.GOOD }) + '</div>';
+        return '<div class="v-bad">' + t('dist.none', { n: Engine.GOOD }) + '</div>';
       }
       var line = '<div class="' + cls + '">' + t(key, {
-        who: who, min: fmtMm(use.min), max: fmtMm(use.max),
+        min: fmtMm(use.min), max: fmtMm(use.max),
         n: good ? Engine.GOOD : Engine.TRACK_MIN }) + '</div>';
       if (use.segments > 1) {
         line += '<div class="subrow">' + t('dist.patchy', { n: use.segments }) + '</div>';
@@ -637,14 +704,10 @@
     }).join('');
 
     $('dist').querySelector('tbody').innerHTML = DISTANCES_MM.map(function (z, i) {
-      var a = pt[i], b = ls[i];
-      var best = Math.max(a.points, b.points);
-      return '<tr class="' + (best >= Engine.GOOD ? 'used' : '') + '">'
+      var a = pt[i];
+      return '<tr class="' + (a.points >= Engine.GOOD ? 'used' : '') + '">'
         + '<td>' + fmtMm(z) + '</td>'
-        + '<td>' + a.dpi.toFixed(1) + '</td>'
         + '<td class="' + vClass(a.points) + '">' + a.points + '</td>'
-        + '<td>' + b.dpi.toFixed(1) + '</td>'
-        + '<td class="' + vClass(b.points) + '">' + b.points + '</td>'
         + '<td>' + (a.fits ? '' : '<span class="tag">' + t('dist.overflow') + '</span>')
         + '</td></tr>';
     }).join('');

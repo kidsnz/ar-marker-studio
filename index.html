@@ -8,7 +8,7 @@
 <!-- js / css を更新したら ?v= の数字を1つ上げる。
      GitHub Pages は10分キャッシュするため、これが無いと利用者の手元で
      古いファイルと新しいファイルが混ざって画面が壊れることがある -->
-<link rel="stylesheet" href="css/style.css?v=11">
+<link rel="stylesheet" href="css/style.css?v=13">
 </head>
 <body>
 
@@ -95,12 +95,15 @@
 <!-- ============ 3. Recommended settings ============ -->
 <section id="step-search" hidden>
   <h2 data-i18n="search.title">3. Recommended settings</h2>
-  <p class="hint" data-i18n="search.hint">Every combination of scale and -level is generated for real
-     and then scored, so the point counts and the file sizes below are exact rather than estimated.
-     In the browser each generation takes roughly 4.5s for a 320&times;228 image, so the full sweep
-     of 25 takes a few minutes. Larger images and larger scales take longer still.</p>
+  <p class="hint" data-i18n="search.hint">This starts on its own once an image is loaded. Each scale is
+     generated for real and then scored, so the point counts and file sizes below are exact rather than
+     estimated. Only <code>-level=4</code> is tried: it wins on quality every time, and the other levels
+     barely move the file size (that is set by the <code>.fset3</code>, which <code>-level</code> does not
+     touch). Generating is slow &mdash; measured at 4.5s for a 320&times;228 image and 28.6s for
+     1920&times;1080 &mdash; so a big image takes minutes.</p>
   <p class="row">
     <button type="button" id="search-run" class="primary" data-i18n="btn.search">Find the best settings</button>
+    <button type="button" id="search-stop" hidden data-i18n="btn.stop">Stop</button>
     <span id="search-progress" class="hint"></span>
   </p>
   <div id="picks" class="picks" hidden></div>
@@ -134,7 +137,6 @@
       <strong>The total is meaningless. Only the band you actually use matters.</strong></caption>
     <thead><tr>
       <th>#</th>
-      <th data-i18n="tbl.range">Valid range (dpi)</th>
       <th data-i18n="tbl.px">Pixels</th>
       <th data-i18n="tbl.pts">Points</th>
       <th></th>
@@ -151,10 +153,7 @@
   <table id="dist">
     <thead><tr>
       <th data-i18n="dist.col">Distance</th>
-      <th data-i18n="dist.updpi">upright dpi</th>
-      <th data-i18n="dist.uppts">points</th>
-      <th data-i18n="dist.sidedpi">sideways dpi</th>
-      <th data-i18n="dist.sidepts">points</th>
+      <th data-i18n="dist.uppts">Points</th>
       <th></th>
     </tr></thead>
     <tbody></tbody>
@@ -214,6 +213,8 @@
         <input type="text" id="name" value="marker" size="16">
       </p>
       <p id="genstat" class="hint"></p>
+      <p id="gen-blocked" class="hint" hidden data-i18n="gen.blocked">The search is using the generator
+        right now. Wait for it to finish, or press Stop above.</p>
     </div>
     <button type="button" id="gen" class="genpanel" data-i18n="btn.gen">Generate &amp; download</button>
   </div>
@@ -236,14 +237,14 @@
      <a href="https://github.com/kidsnz/ar-marker-studio" data-i18n="foot.source">Source</a></p>
 </footer>
 
-<script src="js/i18n.js?v=11"></script>
-<script src="js/png.js?v=11"></script>
-<script src="js/engine.js?v=11"></script>
-<script src="js/fset3.js?v=11"></script>
-<script src="js/heatmap.js?v=11"></script>
-<script src="js/fset.js?v=11"></script>
-<script src="js/generate.js?v=11"></script>
-<script src="js/search.js?v=11"></script>
-<script src="js/app.js?v=11"></script>
+<script src="js/i18n.js?v=13"></script>
+<script src="js/png.js?v=13"></script>
+<script src="js/engine.js?v=13"></script>
+<script src="js/fset3.js?v=13"></script>
+<script src="js/heatmap.js?v=13"></script>
+<script src="js/fset.js?v=13"></script>
+<script src="js/generate.js?v=13"></script>
+<script src="js/search.js?v=13"></script>
+<script src="js/app.js?v=13"></script>
 </body>
 </html>
