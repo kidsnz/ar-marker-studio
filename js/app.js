@@ -31,6 +31,7 @@
     'meta.rgb': 'colour → converted with (r+g+b)/3',
     'meta.png': 'PNG (decoded here, so values match the generator exactly)',
     'meta.jpeg': 'JPEG (decoded by canvas; values differ slightly from the generator)',
+    'cfg.fillIs': '\u2192 fills {near}\u2013{far}% of the screen ({npx}\u2013{fpx}px across)',
     'meta.scale': 'Upscaled',
     'meta.scaleV': '{k}× nearest-neighbour (source was {w}×{h})',
 
@@ -259,8 +260,25 @@
       $('dist-near').value = b.dataset.near;
       $('dist-far').value = b.dataset.far;
       syncDpiFromMm();
+      showFill();
     });
   });
+  ['size-mm', 'dist-near', 'dist-far'].forEach(function (id) {
+    $(id).addEventListener('input', showFill);
+  });
+
+  /** その距離だとマーカーが画面の何割を占めるかを、入力欄の横に出す */
+  function showFill() {
+    var mm = parseFloat($('size-mm').value);
+    if (!(mm > 0)) { $('fill-dist').textContent = ''; return; }
+    var zs = distances(2), f = Engine.focalPx(Engine.REGION_PORTRAIT);
+    var vis = Engine.REGION_PORTRAIT[0];
+    var a = f * mm / zs[0] / vis, b2 = f * mm / zs[zs.length - 1] / vis;
+    $('fill-dist').textContent = t('cfg.fillIs', {
+      near: Math.round(a * 100), far: Math.round(b2 * 100),
+      npx: Math.round(a * vis), fpx: Math.round(b2 * vis)
+    });
+  }
 
   /**
    * 採点に使う距離(mm)の並び。入力欄は cm で受ける。

@@ -8,7 +8,7 @@
 <!-- js / css を更新したら ?v= の数字を1つ上げる。
      GitHub Pages は10分キャッシュするため、これが無いと利用者の手元で
      古いファイルと新しいファイルが混ざって画面が壊れることがある -->
-<link rel="stylesheet" href="css/style.css?v=18">
+<link rel="stylesheet" href="css/style.css?v=20">
 </head>
 <body>
 
@@ -82,21 +82,25 @@
     </label>
   </div>
   <p class="preset"><span data-i18n="cfg.uses">Where will it be used?</span>
-    <button type="button" class="use" data-mm="1626" data-near="150" data-far="200"
-      data-i18n="cfg.uPaint">Painting 64in, from 1.5&ndash;2m</button>
-    <button type="button" class="use" data-mm="120" data-near="30" data-far="50"
-      data-i18n="cfg.uScreen">On a laptop screen 12cm, from 30&ndash;50cm</button>
-    <button type="button" class="use" data-mm="45" data-near="20" data-far="30"
-      data-i18n="cfg.uSticker">Sticker 4.5cm, from 20&ndash;30cm</button>
+    <button type="button" class="use" data-mm="1829" data-near="150" data-far="220"
+      data-i18n="cfg.uPaint">Painting 72in, from 1.5&ndash;2.2m</button>
+    <button type="button" class="use" data-mm="120" data-near="25" data-far="40"
+      data-i18n="cfg.uScreen">On a laptop screen 12cm, from 25&ndash;40cm</button>
+    <button type="button" class="use" data-mm="55" data-near="10" data-far="15"
+      data-i18n="cfg.uSticker">Sticker 5.5cm, from 10&ndash;15cm</button>
   </p>
   <p class="row">
     <label for="dist-near" data-i18n="cfg.dist">Viewing distance</label>
     <input type="number" id="dist-near" min="1" step="1" value="150"> &ndash;
-    <input type="number" id="dist-far" min="1" step="1" value="200"> cm
-    <span class="hint" data-i18n="cfg.dist.sub">Everything below is judged for this range.
-      The marker's printed size and this distance are the only two things that decide
-      how big it looks to the tracker.</span>
+    <input type="number" id="dist-far" min="1" step="1" value="220"> cm
+    <span id="fill-dist" class="hint"></span>
   </p>
+  <p class="hint" data-i18n="cfg.dist.sub">What the tracker actually sees is how much of the screen
+    the marker fills, shown next to the distance. The three real uses do not land in the same place:
+    a painting fills the screen or spills past it, while a sticker or a laptop screen can only reach
+    about a third to a half &mdash; you cannot get close enough, the phone stops focusing at around
+    10cm. So a marker that has to cover all three needs to hold up from roughly
+    <strong>65px to 230px</strong> across.</p>
   <p class="preset"><span data-i18n="cfg.presets">Common sizes:</span>
     <button type="button" class="mm" data-mm="305" data-i18n="cfg.p305">12" record 305mm</button>
     <button type="button" class="mm" data-mm="180" data-i18n="cfg.p180">7" record 180mm</button>
@@ -256,14 +260,14 @@
      <a href="https://github.com/kidsnz/ar-marker-studio" data-i18n="foot.source">Source</a></p>
 </footer>
 
-<script src="js/i18n.js?v=18"></script>
-<script src="js/png.js?v=18"></script>
-<script src="js/engine.js?v=18"></script>
-<script src="js/fset3.js?v=18"></script>
-<script src="js/heatmap.js?v=18"></script>
-<script src="js/fset.js?v=18"></script>
-<script src="js/generate.js?v=18"></script>
-<script src="js/search.js?v=18"></script>
-<script src="js/app.js?v=18"></script>
+<script src="js/i18n.js?v=20"></script>
+<script src="js/png.js?v=20"></script>
+<script src="js/engine.js?v=20"></script>
+<script src="js/fset3.js?v=20"></script>
+<script src="js/heatmap.js?v=20"></script>
+<script src="js/fset.js?v=20"></script>
+<script src="js/generate.js?v=20"></script>
+<script src="js/search.js?v=20"></script>
+<script src="js/app.js?v=20"></script>
 </body>
 </html>
