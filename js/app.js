@@ -62,7 +62,7 @@
     'why.small.eq': 'Same {c}/{n} distances but spread {s}% instead of {s2}%, {d} KB smaller.',
     'why.small.same': 'Nothing smaller was worth taking, so the balanced choice is also the smallest.',
     'btn.use': 'Use these settings',
-    'btn.dlAll': '\u25bc all three (.zip)',
+    'btn.dlAll': '\u25bc all three',
     'pick.applied': 'Applied. The working image is now {k}× and -dpi/-level are filled in. '
       + 'The three files are generated already, so the buttons above download them as they are.',
 
@@ -114,7 +114,7 @@
       + ' / {n} points selected (cap {max2})',
     'gen.loading': 'Loading the generator… (about 1MB, first time only)',
     'gen.running': 'Generating… {t}',
-    'gen.done': 'Done in {s}s. All three files come down as one .zip \u2014 unzip it and keep them together. Browsers quietly drop the 2nd and 3rd of three separate downloads, so one archive is the only way they all arrive. The links below fetch them individually.',
+    'gen.done': 'Done in {s}s. All three files are downloading \u2014 keep them in the same folder. The first time, the browser asks whether to allow multiple downloads; say yes and it will not ask again. Anything that did not arrive is on the links below.',
     'gen.match': 'Prediction matched the real output across all {n} bands.',
     'gen.mismatch': 'Prediction differed in {d} of {n} bands (actual: [{got}]). '
       + 'On flat artwork the generator\'s own rounding can shift things by a few percent.',
@@ -965,6 +965,31 @@
     if (search.picks) showPicks();
     if (state.result) showResult();
   };
+
+  // ------------------------------------------------------------------
+  // 明るさの切り替え（自動 / ライト / ダーク）
+  //
+  // 既定は「自動」= OS の設定に従う。明示的に選んだらそれを覚える。
+  // CSS 側は :root[data-theme] と prefers-color-scheme の両方を見ている
+  // ------------------------------------------------------------------
+  (function () {
+    var sel = $('theme');
+    var saved = null;
+    try { saved = localStorage.getItem('ams-theme'); } catch (e) { /* 無視 */ }
+    function apply(v) {
+      if (v === 'light' || v === 'dark') {
+        document.documentElement.setAttribute('data-theme', v);
+      } else {
+        document.documentElement.removeAttribute('data-theme');
+      }
+    }
+    sel.value = (saved === 'light' || saved === 'dark') ? saved : 'auto';
+    apply(sel.value);
+    sel.addEventListener('change', function () {
+      apply(sel.value);
+      try { localStorage.setItem('ams-theme', sel.value); } catch (e) { /* 無視 */ }
+    });
+  })();
 
   I18N.init();
 

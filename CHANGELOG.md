@@ -3,6 +3,20 @@
 このファイルの書き方は [Keep a Changelog](https://keepachangelog.com/ja/1.1.0/)、
 バージョンの付け方は [Semantic Versioning](https://semver.org/lang/ja/) に従う。
 
+## [2.6.0] - 2026-08-15
+
+### 追加
+- **明るさの切り替え（自動 / ライト / ダーク）を足した。** これまでは OS の設定に
+  従うだけで選べなかった。既定は「自動」のままで、選べば覚える
+
+### 変更
+- **2.5.0 の ZIP をやめ、3ファイルを別々に落とす形に戻した。**
+  そのまま markers のフォルダに置けるほうがよいという判断
+  - ただし**ブラウザはサイトごとに「複数ファイルのダウンロード」を既定でブロックする**。
+    実測で確認済み（許可前は1つ目の `.fset` しか届かない）。
+    初回だけアドレスバーの確認で「常に許可」を押す必要がある。これはコードでは回避できない
+  - 届かなかったぶんは、下に出るリンクから個別に取れる
+
 ## [2.5.0] - 2026-08-15
 
 ### 追加
@@ -303,6 +317,7 @@ Python の `zipfile` と macOS の `unzip` の両方で開けること、
 - 本物の生成器をブラウザ内で走らせる生成機能
 - 英語・日本語の切り替え
 
+[2.6.0]: https://github.com/kidsnz/ar-marker-studio/compare/v2.5.0...v2.6.0
 [2.5.0]: https://github.com/kidsnz/ar-marker-studio/compare/v2.4.0...v2.5.0
 [2.4.0]: https://github.com/kidsnz/ar-marker-studio/compare/v2.3.0...v2.4.0
 [2.3.0]: https://github.com/kidsnz/ar-marker-studio/compare/v2.2.0...v2.3.0

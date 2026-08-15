@@ -24,8 +24,11 @@
   --bad: #c0392b;
   --warn-bg: #fdf5e6;
 }
+/* 暗い配色。OS がダークのとき、または明示的にダークを選んだときに使う。
+   ライトを明示的に選んだときは OS がダークでも当てない（:not で外している）。
+   同じ値を2箇所に書いているのは、CSS だけで「OS任せ／明示指定」を両立させるため */
 @media (prefers-color-scheme: dark) {
-  :root {
+  :root:not([data-theme="light"]) {
     --bg: #0d1117;
     --fg: #e6edf3;
     --muted: #8b949e;
@@ -38,6 +41,19 @@
     --bad: #e57e7e;
     --warn-bg: #221a08;
   }
+}
+:root[data-theme="dark"] {
+  --bg: #0d1117;
+  --fg: #e6edf3;
+  --muted: #8b949e;
+  --line: #30363d;
+  --panel: #161b22;
+  --accent: #42b983;
+  --accent-soft: #8dd5b4;
+  --good: #42b983;
+  --warn: #d29922;
+  --bad: #e57e7e;
+  --warn-bg: #221a08;
 }
 
 * { box-sizing: border-box; }

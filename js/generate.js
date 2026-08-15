@@ -93,102 +93,22 @@
     setTimeout(function () { URL.revokeObjectURL(url); }, 1000);
   }
 
-  // ------------------------------------------------------------------
-  // ZIP（無圧縮）を自前で作る
-  //
-  // **3つ別々に落とそうとしてはいけない。** 実測すると Chrome は2つ目以降を
-  // 黙って捨て、1つしか届かなかった（マーカーは3つ揃わないと使えないので致命的）。
-  // 「複数ファイルのダウンロードを許可」を利用者に押させる作りにもしたくない。
-  // ZIP なら1ファイルなので必ず届く。中身は既に圧縮済み（iset は JPEG、
-  // fset3 はバイナリ）なので、無圧縮で入れても大きさはほとんど変わらない。
-  // ------------------------------------------------------------------
-  var CRC_TABLE = (function () {
-    var t = new Uint32Array(256);
-    for (var n = 0; n < 256; n++) {
-      var c = n;
-      for (var k = 0; k < 8; k++) c = (c & 1) ? (0xEDB88320 ^ (c >>> 1)) : (c >>> 1);
-      t[n] = c >>> 0;
-    }
-    return t;
-  })();
-
-  function crc32(bytes) {
-    var c = 0xFFFFFFFF;
-    for (var i = 0; i < bytes.length; i++) {
-      c = CRC_TABLE[(c ^ bytes[i]) & 0xFF] ^ (c >>> 8);
-    }
-    return (c ^ 0xFFFFFFFF) >>> 0;
-  }
-
   /**
-   * 無圧縮の ZIP を組み立てる。
-   * @param entries [{name, bytes}]
-   * @returns {Uint8Array}
-   */
-  function makeZip(entries) {
-    var enc = new TextEncoder();
-    var parts = [], central = [], offset = 0;
-    // 日時は固定にする（同じ入力なら同じ ZIP が出るように）。1980-01-01 00:00
-    var DOS_TIME = 0, DOS_DATE = 33;
-
-    entries.forEach(function (e) {
-      var name = enc.encode(e.name), crc = crc32(e.bytes), len = e.bytes.length;
-      var h = new DataView(new ArrayBuffer(30));
-      h.setUint32(0, 0x04034b50, true);   // ローカルヘッダの署名
-      h.setUint16(4, 20, true);           // 必要バージョン
-      h.setUint16(6, 0, true);            // フラグ
-      h.setUint16(8, 0, true);            // 方式 0 = 無圧縮
-      h.setUint16(10, DOS_TIME, true);
-      h.setUint16(12, DOS_DATE, true);
-      h.setUint32(14, crc, true);
-      h.setUint32(18, len, true);         // 圧縮後の大きさ（無圧縮なので同じ）
-      h.setUint32(22, len, true);         // 元の大きさ
-      h.setUint16(26, name.length, true);
-      h.setUint16(28, 0, true);           // extra なし
-      parts.push(new Uint8Array(h.buffer), name, e.bytes);
-
-      var c = new DataView(new ArrayBuffer(46));
-      c.setUint32(0, 0x02014b50, true);   // 中央ディレクトリの署名
-      c.setUint16(4, 20, true); c.setUint16(6, 20, true);
-      c.setUint16(8, 0, true); c.setUint16(10, 0, true);
-      c.setUint16(12, DOS_TIME, true); c.setUint16(14, DOS_DATE, true);
-      c.setUint32(16, crc, true);
-      c.setUint32(20, len, true); c.setUint32(24, len, true);
-      c.setUint16(28, name.length, true);
-      c.setUint16(30, 0, true); c.setUint16(32, 0, true);
-      c.setUint16(34, 0, true); c.setUint16(36, 0, true);
-      c.setUint32(38, 0, true);
-      c.setUint32(42, offset, true);      // このファイルのローカルヘッダの位置
-      central.push(new Uint8Array(c.buffer), name);
-      offset += 30 + name.length + len;
-    });
-
-    var cdSize = central.reduce(function (a, b) { return a + b.length; }, 0);
-    var end = new DataView(new ArrayBuffer(22));
-    end.setUint32(0, 0x06054b50, true);   // 終端レコードの署名
-    end.setUint16(4, 0, true); end.setUint16(6, 0, true);
-    end.setUint16(8, entries.length, true); end.setUint16(10, entries.length, true);
-    end.setUint32(12, cdSize, true);
-    end.setUint32(16, offset, true);
-    end.setUint16(20, 0, true);           // コメントなし
-
-    var all = parts.concat(central, [new Uint8Array(end.buffer)]);
-    var total = all.reduce(function (a, b) { return a + b.length; }, 0);
-    var out = new Uint8Array(total), at = 0;
-    all.forEach(function (b) { out.set(b, at); at += b.length; });
-    return out;
-  }
-
-  /**
-   * 3つまとめて1つの ZIP で落とす。**マーカーは3つ揃って初めて使えるので、これが既定。**
+   * 3つまとめて落とす。**マーカーは3つ揃って初めて使えるので、これが既定。**
+   *
+   * 【ブラウザの制限】サイトごとに「複数ファイルのダウンロード」を1度許可するまで、
+   * ブラウザは2つ目以降を落とさない（実測: 許可前は .fset だけしか届かなかった）。
+   * Chrome ならアドレスバーの右端に確認が出るので、一度「許可」すれば以後は黙って3つ届く。
+   * 落ちなかったぶんは、下に出るリンクから個別に取れる。
+   *
+   * 間隔を空けるのは、続けて呼ぶとブラウザが取りこぼすことがあるため。
    * @param files {fset, fset3, iset}
    * @param base 拡張子を除いたファイル名
    */
   function downloadAll(files, base) {
-    var zip = makeZip(['fset', 'fset3', 'iset'].map(function (ext) {
-      return { name: base + '.' + ext, bytes: files[ext] };
-    }));
-    download(zip, base + '.zip');
+    ['fset', 'fset3', 'iset'].forEach(function (ext, i) {
+      setTimeout(function () { download(files[ext], base + '.' + ext); }, i * 400);
+    });
   }
 
   /** ダウンロード用のリンクを作る（あとからもう一度落としたいとき用） */
@@ -203,5 +123,5 @@
   }
 
   root.Generator = { generate: generate, download: download,
-                     downloadAll: downloadAll, makeZip: makeZip, linkFor: linkFor };
+                     downloadAll: downloadAll, linkFor: linkFor };
 })(typeof self !== 'undefined' ? self : this);
