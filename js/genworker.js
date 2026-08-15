@@ -14,7 +14,8 @@
  * 探索の結果が「拡大率も level も違うのに全部同じ数字」になって発覚した。
  * ワーカー自体は使い回すので、1MB のスクリプトの読み直しまでは起きない。
  */
-importScripts('../vendor/NftMarkerCreator.min.js');
+// 自分の URL に付いてきた ?v= をそのまま引き継ぐ（ワーカーの中だけ古くならないように）
+importScripts('../vendor/NftMarkerCreator.min.js' + self.location.search);
 
 var logSink = null;
 

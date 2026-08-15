@@ -50,7 +50,7 @@
 
   function getWorker() {
     if (worker) return worker;
-    worker = new Worker('js/genworker.js');
+    worker = new Worker('js/genworker.js' + (root.AMS_VER || ''));
     worker.onmessage = function (e) {
       var m = e.data, w = waiting[m.id];
       if (!w) return;

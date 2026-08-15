@@ -9,6 +9,18 @@
 
   var $ = function (id) { return document.getElementById(id); };
 
+  // 自分の <script src="js/app.js?v=14"> から版数を取り、Worker にも同じものを付ける。
+  // **これが無いと ?v= を上げても Worker の中身が古いまま残る。**
+  // index.html の ?v= は <script> と <link> にしか効かず、
+  // new Worker() と、その中の importScripts() は素の URL で取りに行くため
+  var VER = (function () {
+    var src = (document.currentScript && document.currentScript.src) || '';
+    var m = src.match(/[?&]v=([^&]+)/);
+    return m ? '?v=' + m[1] : '';
+  })();
+  // generate.js は自分で版数を知りようがないので、ここから渡す
+  self.AMS_VER = VER;
+
   // 動的に組み立てる文字列の英語原本。日本語は js/i18n.js が持つ
   self.I18N_EN = self.I18N_EN || {};
   var EN = {
@@ -56,8 +68,11 @@
     'res.portrait.short': 'upright',
     'res.apparent': 'apparent {n} dpi →',
     'res.points': 'points',
-    'res.summary': 'Source {w}×{h} / -dpi={dpi} / -level={level} → printed {mw}×{mh} mm'
-      + '  /  {total} tracking points in total',
+    'res.summary': 'Source {w}×{h} / -dpi={dpi} / -level={level} → printed {mw}×{mh} mm',
+    'res.skipped': '{n} of the {total} distance bands were not computed: they are only reached '
+      + 'when the marker is larger than the screen. They are still in the generated .fset. '
+      + 'Skipping them is what keeps this fast — measured on a 1920×1080 image, they were '
+      + '12.0s of the 12.2s.',
     'res.usedBy': 'this is the band actually used',
     'verdict.stable': 'stable',
     'verdict.marginal': 'marginal',
@@ -540,7 +555,7 @@
 
     var bw = Engine.toBW(state.rgba, state.W, state.H).bw;
     if (worker) worker.terminate();
-    worker = new Worker('js/worker.js');
+    worker = new Worker('js/worker.js' + VER);
     worker.onmessage = function (e) {
       var m = e.data;
       if (m.type === 'progress') {
@@ -560,8 +575,18 @@
         alert(t('err.calc', { m: m.message }));
       }
     };
+    // 計算する距離帯の上限。
+    // マーカーが画面いっぱいに写るときの見かけ dpi の2倍まで見る。
+    // 2倍 = 画面の2倍の大きさに写るまで寄った状態で、距離表のいちばん近い行より
+    // さらに近い。それより上の帯は**使えないうえに、いちばん重い**
+    // （実測 1920x1080: 予測12.2秒のうち12.0秒がその帯）
+    var mmW = parseFloat($('size-mm').value) || 305;
+    var maxDpi = Engine.apparentDpi(mmW, mmW * state.H / state.W,
+                                    Engine.REGION_PORTRAIT) * 2;
+
     // bw はコピーせず所有権ごと渡す（元は使い終わっている）
-    worker.postMessage({ bw: bw, W: state.W, H: state.H, dpi: dpi, level: level },
+    worker.postMessage({ bw: bw, W: state.W, H: state.H, dpi: dpi, level: level,
+                         maxDpi: maxDpi },
                        [bw.buffer]);
   }
 
@@ -582,7 +607,7 @@
     $('verdicts').innerHTML =
       '<p class="hint">' + t('res.summary', {
         w: r.W, h: r.H, dpi: +r.dpi.toFixed(2), level: r.level,
-        mw: ev.widthMm.toFixed(0), mh: ev.heightMm.toFixed(0), total: ev.total
+        mw: ev.widthMm.toFixed(0), mh: ev.heightMm.toFixed(0)
       }) + '</p>'
       + verdictRow('res.portrait', Engine.REGION_PORTRAIT, ev.portrait)
       + '<p class="warn">' + t('res.provisional', { good: Engine.GOOD, poor: Engine.POOR,
@@ -621,6 +646,11 @@
     }
 
     $('basis').textContent = t('res.basis');
+    // 計算を飛ばした帯があるなら、黙って落とさずその場で言う
+    if (r.skipped) {
+      $('basis').textContent += '  ' + t('res.skipped', { n: r.skipped,
+                                                          total: r.bandsTotal });
+    }
     if (state.detect) {
       var n = 0;
       r.bands.forEach(function (b, i) {

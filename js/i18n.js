@@ -113,7 +113,11 @@
     'res.portrait.short': '縦持ち',
     'res.apparent': '見かけ {n} dpi →',
     'res.points': '点',
-    'res.summary': '元画像 {w}×{h} / -dpi={dpi} / -level={level} → 実寸 {mw}×{mh} mm　　追従点の合計 {total} 点',
+    'res.summary': '元画像 {w}×{h} / -dpi={dpi} / -level={level} → 実寸 {mw}×{mh} mm',
+    'res.skipped': '距離帯 {total} 段のうち {n} 段は計算していない。'
+      + 'マーカーが画面より大きく写るときにしか使われない帯だから'
+      + '（生成される .fset にはちゃんと入る）。'
+      + 'ここを飛ばすのが速さの理由で、1920×1080 の実測では予測12.2秒のうち12.0秒がこの帯だった。',
     'res.usedBy': 'この帯を使う',
     'verdict.stable': '安定',
     'verdict.marginal': '不足ぎみ',

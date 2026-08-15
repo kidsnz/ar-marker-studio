@@ -565,10 +565,23 @@
     var bands = bandRanges(dpis);
     var out = [];
 
-    for (var i = 0; i < dpis.length; i++) {
+    // 【重要】上の方の距離帯は「マーカーが画面より大きく写る」ときにしか使われない。
+    // 生成器は必ず全部の帯を作るので .fset の中身は変わらないが、**予測する必要は無い**。
+    // しかもその帯は画像が大きい＝いちばん重い。実測（1920x1080）:
+    //   予測ぜんぶ 12.2秒 ／ うち画面に収まらない帯が 12.0秒（98.4%）
+    // opts.maxDpi を渡すと、それを超える帯は計算せずに飛ばす。
+    // 渡さなければ全部計算する（生成器のログとの照合はこちらを使う）。
+    var todo = [];
+    for (var j = 0; j < dpis.length; j++) {
+      if (opts.maxDpi == null || bands[j].mindpi <= opts.maxDpi) todo.push(j);
+    }
+    var skipped = dpis.length - todo.length;
+
+    for (var n = 0; n < todo.length; n++) {
+      var i = todo[n];
       var img = i === 0 ? { bw: bw0, W: W0, H: H0 }
                         : scaleImage(bw0, W0, H0, dpis[0], dpis[i]);
-      if (opts.onProgress) opts.onProgress(i, dpis.length, img.W, img.H, dpis[i]);
+      if (opts.onProgress) opts.onProgress(n, todo.length, img.W, img.H, dpis[i]);
       var fm = featureMap(img.bw, img.W, img.H);
       var sel = selectFeatures(fm, img.W, img.H, level);
       out.push({
@@ -582,8 +595,10 @@
         usable: Int32Array.from(sel.usable)
       });
     }
-    if (opts.onProgress) opts.onProgress(dpis.length, dpis.length);
-    return { bands: out, W: W0, H: H0, dpi: dpi, level: level };
+    if (opts.onProgress) opts.onProgress(todo.length, todo.length);
+    // skipped … 計算を飛ばした帯の数。bandsTotal … 生成器が実際に作る帯の数
+    return { bands: out, W: W0, H: H0, dpi: dpi, level: level,
+             skipped: skipped, bandsTotal: dpis.length };
   }
 
   // ------------------------------------------------------------------
