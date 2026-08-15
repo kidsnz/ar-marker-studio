@@ -46,13 +46,13 @@
     'search.stopped': 'Stopped after {n} of {total}. The recommendations below use what was finished.',
     'search.skipped': 'Not tried: {list}, because upscaling would push the image past '
       + '{mp} megapixels and the browser would run out of memory.',
-    'search.region': 'Scored for a phone held upright ({w}×{h} effective), the same basis as the verdict below.',
+    'search.region': 'Scored for a phone held upright at the viewing distance set above, counting only the part of the marker that is actually on screen.',
     'pick.best': 'Best tracking',
     'pick.balanced': 'Balanced',
     'pick.small': 'Smallest',
     'pick.set': '{k}× / -level={lv} / -dpi={dpi}   ({w}×{h})',
     'pick.size': '{kb} KB in total   (.fset {f} / .fset3 {f3} / .iset {i} KB)',
-    'pick.profileNote': 'Tracking points by how much of the frame the marker fills:',
+    'pick.profileNote': 'Tracking points at each viewing distance:',
     'why.best': 'Usable at {c} of the {n} distances, spread {s}%. The best of the {tried} tried.',
     'why.balanced': 'Same {c}/{n} distances as the best one, spread {s}% against its {s2}%, {d} KB smaller.',
     'why.balanced.eq': 'Same {c}/{n} distances and the same {s}% spread as the best one, {d} KB smaller.',
@@ -68,6 +68,8 @@
     'res.portrait.short': 'upright',
     'res.apparent': 'apparent {n} dpi →',
     'res.points': 'points',
+    'res.onScreen': '{px}px across on the tracker\u2019s canvas \u2192',
+    'res.detailCrop': 'spread {spread}% / the marker is bigger than the frame, so only the middle {vis}% counts ({all} points in total) / {fb} with the runtime fallback',
     'res.summary': 'Source {w}×{h} / -dpi={dpi} / -level={level} → printed {mw}×{mh} mm',
     'tbl.tooClose': 'too close, the marker runs off the frame',
     'res.tooSmall': '{n} more bands are left out of the table: their image is {ts}px or '
@@ -82,13 +84,13 @@
     'verdict.marginal': 'marginal',
     'verdict.limit': 'on the edge',
     'verdict.cannot': 'cannot track',
-    'res.detail': '{sel} of them can actually be picked / spread {spread}% / {fb} with the runtime fallback',
+    'res.detail': 'spread {spread}% / {fb} with the runtime fallback',
     'res.floor': 'Tracking stops below {n} points, so one lost point ends it.',
-    'res.provisional': '<strong>"stable" and "marginal" are provisional.</strong> The {good} and {poor} point thresholds were calibrated against the same ~181px width this tool now uses, so they carry over — but the device notes they came from contain a contradiction that is still open: a marker written down as steady works out at 2 points under the stock letterbox model, below the {floor}-point floor where tracking stops outright. Only that {floor}-point floor comes from the source (tracking.c) rather than from how something felt.',
     'res.cap': 'Only {n} points are tried per frame, so more than that buys little. Spread matters more than count.',
     'res.spreadNote': 'Spread is the area the points enclose, as a share of the marker. '
       + 'The tracker picks its first four points to maximise exactly this. '
-      + 'Measured on real devices: 1% jumps around, 17% mostly stable, 33% stable.',
+      + 'Measured on real devices: 1% jumps around, 17% mostly stable, 33% stable. '
+      + 'When the marker is bigger than the frame, only the visible middle is measured — that is the reading that matched the real devices.',
     'res.basis': 'ARnft processes the camera image on a fixed 320×240 canvas (hardcoded in '
       + 'ARnft.js prepareImage). Held upright, ARnft-rot turns the video 90° so the marker '
       + 'gets 240×320 of that canvas instead of the 180×240 the stock letterbox leaves. '
@@ -246,6 +248,37 @@
     });
   });
 
+  // 用途のプリセット。実寸と距離をまとめて入れる。
+  // この3つは実際の使われ方（2026-08-15 に本人から）:
+  //   絵 … works ページ記載の実寸（50〜70インチ級）を 1.5〜2m から
+  //   画面 … サイトの作品画像は 14インチで 80〜146mm、30〜50cm から
+  //   ステッカー … 4〜5cm を 20〜30cm から
+  Array.prototype.forEach.call(document.querySelectorAll('button.use'), function (b) {
+    b.addEventListener('click', function () {
+      $('size-mm').value = b.dataset.mm;
+      $('dist-near').value = b.dataset.near;
+      $('dist-far').value = b.dataset.far;
+      syncDpiFromMm();
+    });
+  });
+
+  /**
+   * 採点に使う距離(mm)の並び。入力欄は cm で受ける。
+   * 「画面幅の何割」ではなく実際の距離で考える。使う人が知っているのはそちらだから
+   */
+  function distances(n) {
+    var a = parseFloat($('dist-near').value) * 10;
+    var b = parseFloat($('dist-far').value) * 10;
+    if (!(a > 0)) a = 1500;
+    if (!(b > 0)) b = a;
+    if (b < a) { var t = a; a = b; b = t; }
+    n = n || 5;
+    if (n === 1 || a === b) return [Math.round(a)];
+    var out = [];
+    for (var i = 0; i < n; i++) out.push(Math.round(a + (b - a) * i / (n - 1)));
+    return out;
+  }
+
   // ------------------------------------------------------------------
   // 3. 自動探索 — 拡大率 × level を総当たりし、**実際に生成して**比べる
   //
@@ -323,6 +356,7 @@
       wMm: mm, hMm: hMm,
       leveli: parseInt($('leveli').value, 10),
       scales: scales,
+      distances: distances(),
       stopped: function () { return search.stop; },
       onStart: function (k, lv, i, n) {
         cur = { k: k, i: i, n: n };
@@ -438,7 +472,7 @@
    * **数字はすべてこの画像で実際に測った値**。一般論は書かない。
    */
   function reasonFor(role, r) {
-    var p = search.picks, n = Search.FILL.length;
+    var p = search.picks, n = distances().length;
     if (role === 'pick.best') {
       return t('why.best', { c: r.coverage, n: n, s: pct(r.spread),
                              tried: search.results.length });
@@ -465,7 +499,7 @@
   function profileHtml(r) {
     return '<div class="profile">' + r.profile.map(function (q) {
       return '<span class="' + (q.points >= Engine.TRACK_MIN ? 'v-good' : 'v-bad') + '">'
-        + '<b>' + q.points + '</b><i>' + Math.round(q.fill * 100) + '%</i></span>';
+        + '<b>' + q.points + '</b><i>' + fmtMm(q.mm) + '</i></span>';
     }).join('') + '</div>';
   }
 
@@ -485,7 +519,7 @@
         + '<td>' + r.level + '</td>'
         + '<td>' + r.dpi + '</td>'
         + '<td>' + r.W + '×' + r.H + '</td>'
-        + '<td>' + r.coverage + '/' + Search.FILL.length + '</td>'
+        + '<td>' + r.coverage + '/' + r.profile.length + '</td>'
         + '<td>' + r.points.map(function (v) {
             return '<span class="' + (v >= Engine.TRACK_MIN ? '' : 'v-bad') + '">'
               + v + '</span>';
@@ -613,9 +647,9 @@
         w: r.W, h: r.H, dpi: +r.dpi.toFixed(2), level: r.level,
         mw: ev.widthMm.toFixed(0), mh: ev.heightMm.toFixed(0)
       }) + '</p>'
-      + verdictRow('res.portrait', Engine.REGION_PORTRAIT, ev.portrait)
-      + '<p class="warn">' + t('res.provisional', { good: Engine.GOOD, poor: Engine.POOR,
-                                                    floor: Engine.TRACK_MIN }) + '</p>'
+      + distances(3).map(function (z) {
+          return verdictRow(Engine.atDistance(r.bands, ev.widthMm, ev.heightMm, z));
+        }).join('')
       + '<p class="hint">' + t('res.spreadNote') + '</p>';
 
     // 【この表の読み方】
@@ -626,6 +660,10 @@
     // 距離は帯の dpi だけで決まる（マーカーの実寸には依らない）
     var focal = Engine.focalPx(Engine.REGION_PORTRAIT);
     var apFill = ev.portrait.dpi;         // マーカーが画面いっぱいのときの見かけ dpi
+    // 実際に見る距離で使われる帯（ここに色を付ける）
+    var useDpis = distances().map(function (z) {
+      return Engine.dpiAtDistance(Engine.REGION_PORTRAIT, z);
+    });
     var shown = r.bands.filter(function (b) { return !b.tooSmall; });
     var hidden = r.bands.length - shown.length;
 
@@ -633,7 +671,11 @@
     var tb = $('bands').querySelector('tbody');
     tb.innerHTML = shown.map(function (b) {
       var fits = b.dpi <= apFill;                          // 画面に収まるか
-      var ok = fits && b.points.length >= Engine.TRACK_MIN; // ここが使える窓
+      // 設定した距離のどれかがこの帯に当たり、かつ追従が成立するか
+      var inUse = useDpis.some(function (ap) {
+        return b.mindpi <= ap && ap <= b.maxdpi;
+      });
+      var ok = inUse && b.points.length >= Engine.TRACK_MIN;
       var det = state.detect && state.detect.levels[b.index];
       return '<tr class="' + (ok ? 'used' : '') + '">'
         + '<td>' + b.index + '</td>'
@@ -646,8 +688,8 @@
               + (det ? det.count : '-') + '</td>'
             : '')
         + '<td><span class="bar" style="width:' + (b.points.length / max * 100) + '%"></span>'
-        + (!fits ? '<span class="tag">' + t('tbl.tooClose') + '</span>'
-                 : (ok ? '<span class="tag">' + t('res.usedBy') + '</span>' : ''))
+        + (ok ? '<span class="tag">' + t('res.usedBy') + '</span>'
+              : (!fits ? '<span class="tag">' + t('tbl.tooClose') + '</span>' : ''))
         + '</td></tr>';
     }).join('');
     search.hiddenBands = hidden;
@@ -700,22 +742,27 @@
     drawHeatmap();
   }
 
-  function verdictRow(labelKey, region, d) {
+  /**
+   * 距離ひとつ分の判定。
+   * 点数は**画面に写っているぶんだけ**。大きい絵ははみ出すので、
+   * 隠れている部分の点を数えると実機と食い違う（2026-08-15 に実測で確認）
+   */
+  function verdictRow(d) {
     var note = '';
-    if (d.points < Engine.POOR) {
+    if (d.points < Engine.TRACK_MIN) {
       note = '<div class="note v-bad">' + t('res.floor', { n: Engine.TRACK_MIN }) + '</div>';
     } else if (d.points > Engine.TRACK_PER_FRAME) {
       note = '<div class="note">' + t('res.cap', { n: Engine.TRACK_PER_FRAME }) + '</div>';
     }
     return '<div class="verdict">'
-      + '<span>' + t(labelKey, { w: Math.round(region[0]),
-                                 h: Math.round(region[1]) }) + '</span>'
-      + '<span class="hint">' + t('res.apparent', { n: d.dpi.toFixed(1) }) + '</span>'
+      + '<span>' + fmtMm(d.mm) + '</span>'
+      + '<span class="hint">' + t('res.onScreen', { px: Math.round(d.onW) }) + '</span>'
       + '<span class="n ' + vClass(d.points) + '">' + d.points + '</span>'
       + '<span class="' + vClass(d.points) + '">' + t('res.points') + '</span>'
       + '<span class="' + vClass(d.points) + '">' + vText(d.points) + '</span></div>'
-      + '<div class="subrow">' + t('res.detail', {
-          sel: d.selectable, spread: (d.spread * 100).toFixed(1), fb: d.fallback
+      + '<div class="subrow">' + t(d.fits ? 'res.detail' : 'res.detailCrop', {
+          spread: (d.spread * 100).toFixed(1), fb: d.fallback, all: d.all,
+          vis: Math.round(Math.min(1, Engine.REGION_PORTRAIT[0] / d.onW) * 100)
         }) + '</div>'
       + note;
   }

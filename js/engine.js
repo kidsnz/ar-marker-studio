@@ -742,6 +742,39 @@
   }
 
   /**
+   * 画面に写っているぶんだけに絞る。
+   *
+   * 【なぜ要るのか】大きい絵は必ず画面からはみ出す。64インチ幅の絵を1.5mから
+   * 見ると画布上 330px になり、見えているのは中央55%だけ。隠れている部分の点まで
+   * 数えると、実機と食い違う。実際 2026-08-15 に実機の報告と突き合わせたところ、
+   * **中央だけで測って初めて一致した**:
+   *   emoticons/01 … 中央の散らばり 0.6% → 実機で「ふわふわ揺れる」
+   *   pizzaboy/07  … 中央の散らばり 19.5% → 実機で問題なし
+   * ガイドの「1%=飛ぶ / 17%=ほぼ安定 / 33%=安定」は正しかった。
+   * 測る範囲を間違えていただけだった。
+   *
+   * @param pts  マーカー全体を 1x1 とした座標
+   * @param onW,onH マーカーが画布上に写る大きさ(px)
+   * @param region  画布のうち画面に見えている大きさ(px)
+   */
+  function visible(pts, onW, onH, region) {
+    var fw = Math.min(1, region[0] / onW), fh = Math.min(1, region[1] / onH);
+    if (fw >= 1 && fh >= 1) return pts;      // 収まっているなら切らない
+    // 画面の中央に構えるものとして、中央の fw × fh を残す
+    var x0 = 0.5 - fw / 2, x1 = 0.5 + fw / 2;
+    var y0 = 0.5 - fh / 2, y1 = 0.5 + fh / 2;
+    return pts.filter(function (p) {
+      return p[0] >= x0 && p[0] <= x1 && p[1] >= y0 && p[1] <= y1;
+    });
+  }
+
+  /** 距離 z(mm) のとき、マーカーが画布上に写る大きさ(px) */
+  function onCanvas(wMm, hMm, z, region) {
+    var f = focalPx(region);
+    return [f * wMm / z, f * hMm / z];
+  }
+
+  /**
    * 判定。**3点を切ると追従そのものが止まる**（tracking.c の `if(num < 3) return -3`）
    * ので、そこを独立した段として扱う。
    */
@@ -750,6 +783,35 @@
     if (n < POOR) return 'limit';         // ギリギリ。1点失うと止まる
     if (n < GOOD) return 'marginal';      // 不足ぎみ
     return 'stable';                      // 安定
+  }
+
+  /**
+   * **ある距離から見たときの実力**を返す。判定も探索の採点もこれを使う。
+   *
+   * 「マーカーが画面幅の何割を占めるか」ではなく、実寸と距離で考える。
+   * 使う人が知っているのはそちらだから（絵の前に1.5mで立つ、ステッカーを25cmから読む）。
+   *
+   * @param bands  予測または .fset の帯
+   * @param wMm,hMm マーカーの実寸
+   * @param z      見る距離(mm)
+   * @param region 画面に見えている画布の大きさ。省略時は縦持ち（回転版）
+   */
+  function atDistance(bands, wMm, hMm, z, region) {
+    region = region || REGION_PORTRAIT;
+    var on = onCanvas(wMm, hMm, z, region);
+    var ap = dpiAtDistance(region, z);
+    var strict = pointsAt(bands, ap, true);
+    var loose = pointsAt(bands, ap, false);
+    // **画面に写っているぶんだけ**を数える。はみ出した部分の点は使えない
+    var sel = selectable(visible(strict, on[0], on[1], region));
+    return {
+      mm: z, dpi: ap, onW: on[0], onH: on[1],
+      fits: on[0] <= region[0] && on[1] <= region[1],
+      points: sel.length,           // 実際に選ばれうる点（画面外と外周1/8を除く）
+      all: strict.length,           // マーカー全体の点（参考。はみ出すと使えない分を含む）
+      fallback: loose.length,       // 実行時のフォールバック込み
+      spread: spreadArea(sel)       // 散らばり。**中央で測る**のが実機と合う
+    };
   }
 
   /** 予測結果に、実寸と持ち方から見た判定を足す */
@@ -802,6 +864,7 @@
     toBW: toBW, dpiLevels: dpiLevels, scaleImage: scaleImage, bandRanges: bandRanges,
     featureMap: featureMap, selectFeatures: selectFeatures, predict: predict,
     evaluate: evaluate, apparentDpi: apparentDpi, usablePoints: usablePoints,
+    atDistance: atDistance, visible: visible, onCanvas: onCanvas,
     verdict: verdict, bandForDpi: bandForDpi,
     CAMERA_FOV_LONG: CAMERA_FOV_LONG, focalPx: focalPx, dpiAtDistance: dpiAtDistance,
     fitDistance: fitDistance, distanceTable: distanceTable, usableRange: usableRange,

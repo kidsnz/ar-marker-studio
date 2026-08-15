@@ -36,8 +36,9 @@
   var SCALES = [1, 2, 3, 4, 6];
   var LEVELS = [4];
 
-  // 判定に使う「マーカーが画面に占める割合」。1.0 = 見えている幅いっぱい。
-  var FILL = [1.0, 0.85, 0.7, 0.55, 0.45, 0.35];
+  // 採点に使う距離は呼び出し側が渡す（実際にどこから見るかは使う人しか知らない）。
+  // 渡されなければ、絵の前に立つ既定（1.2m〜2.2m）で5点。
+  var DISTANCES = [1200, 1450, 1700, 1950, 2200];
 
   // 散らばりの許容幅（マーカー面積に対する割合）。
   // 実測は 1% = 大小に飛ぶ / 17% = ほぼ安定 / 33% = 安定 の3点しかない。
@@ -91,15 +92,21 @@
    * @param wMm,hMm マーカーの実寸
    * @param region 検出に使える領域 [幅px, 高さpx]
    */
-  function score(levels, wMm, hMm, region) {
-    var full = Engine.apparentDpi(wMm, hMm, region);
+  function score(levels, wMm, hMm, region, distances) {
+    distances = distances || DISTANCES;
     var profile = [], worst = Infinity, sum = 0, minSpread = Infinity;
-    for (var i = 0; i < FILL.length; i++) {
-      var ap = full * FILL[i];
-      var n = FSet.usablePoints(levels, ap);
-      var pts = Engine.selectable(FSet.pointsAt(levels, ap, wMm, hMm, true));
+    for (var i = 0; i < distances.length; i++) {
+      var z = distances[i];
+      var ap = Engine.dpiAtDistance(region, z);
+      var on = Engine.onCanvas(wMm, hMm, z, region);
+      // **画面に写っているぶんだけ**数える。大きい絵は必ずはみ出すので、
+      // 隠れている部分の点まで数えると実機と食い違う（2026-08-15 に実測で確認）
+      var pts = Engine.selectable(
+        Engine.visible(FSet.pointsAt(levels, ap, wMm, hMm, true), on[0], on[1], region));
+      var n = pts.length;
       var sp = Engine.spreadArea(pts);
-      profile.push({ fill: FILL[i], points: n, spread: sp });
+      profile.push({ mm: z, points: n, spread: sp,
+                     fits: on[0] <= region[0] && on[1] <= region[1] });
       sum += n;
       if (n < worst) worst = n;
       // 追従が成立している距離だけで、いちばん散らばりが小さいところを見る
@@ -166,7 +173,7 @@
               ms: g.ms, files: g, total: parsed ? parsed.total : 0
             };
             if (parsed) {
-              var s = score(parsed.levels, wMm, hMm, region);
+              var s = score(parsed.levels, wMm, hMm, region, opts.distances);
               r.profile = s.profile; r.worst = s.worst;
               r.coverage = s.coverage; r.points = s.points;
               r.sum = s.sum; r.spread = s.spread;
@@ -255,7 +262,7 @@
     return { best: best, balanced: balanced, small: small };
   }
 
-  var API = { SCALES: SCALES, LEVELS: LEVELS, FILL: FILL,
+  var API = { SCALES: SCALES, LEVELS: LEVELS, DISTANCES: DISTANCES,
               SPREAD_STEP: SPREAD_STEP, KB_STEP: KB_STEP, MAX_PIXELS: MAX_PIXELS,
               upscale: upscale, usableScales: usableScales,
               score: score, search: search, pick: pick, better: better };
