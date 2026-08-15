@@ -39,6 +39,7 @@
     'search.progress': 'Generating and scoring… {i}/{n}',
     'search.took': 'Tried {n} combinations in {s}s. Every number below is measured, not predicted.',
     'search.none': 'Nothing could be generated, so there is nothing to recommend.',
+    'warn.tooBig': 'This image is {w}\u00d7{h} ({mp} megapixels), which is far more than a marker needs. The tracker never sees more than about 250px across, so every extra pixel only adds distance bands that can never be reached \u2014 they still go into the .iset and .fset3 and make the files much larger, and generating takes minutes. **Scale the artwork down to about {rec}px wide first.**',
     'search.failed': '{d} of the {n} could not be generated and are left out.',
     'search.doing': 'Generating {k}\u00d7 ({i}/{n})\u2026 {s}s',
     'search.left': 'about {t} left',
@@ -187,6 +188,14 @@
       state.detect = null;              // 画像を変えたら前の検出結果は捨てる
       clearSearch();                    // 前の画像で探した結果も捨てる
       showImage();
+      // 元画像が大きすぎるなら、進める前に言う（黙って何分も待たせない）
+      var big = Search.tooBig(state.W, state.H);
+      $('big-warn').hidden = !big;
+      if (big) {
+        $('big-warn').textContent = t('warn.tooBig', {
+          w: state.W, h: state.H, mp: (state.W * state.H / 1e6).toFixed(0), rec: big
+        });
+      }
       // 画像が入ったら、判定 → 最適設定の探索まで自動で走らせる。
       // 押させる意味が無いし、探索は時間がかかるので少しでも早く始めたい
       runPredict(true);

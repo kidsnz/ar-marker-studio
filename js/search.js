@@ -55,11 +55,32 @@
   // 1600万画素 = RGBA で 64MB。ここで切って、切ったことは呼び出し側から見えるようにする。
   var MAX_PIXELS = 16e6;
 
-  /** その画像で実際に試せる拡大率だけを返す（大きすぎるものは落とす） */
+  /**
+   * その画像で実際に試せる拡大率だけを返す。
+   *
+   * **等倍(k=1)は必ず残す。** 上限は「拡大でメモリが破裂しないように」入れたもので、
+   * 等倍は新しく確保しないので弾く理由が無い。一度ここを間違えて、
+   * 3660万画素の画像で候補が0通りになり「生成が1つも通らなかった」と出していた。
+   */
   function usableScales(W, H, scales) {
     return (scales || SCALES).filter(function (k) {
-      return W * k * H * k <= MAX_PIXELS;
+      return k === 1 || W * k * H * k <= MAX_PIXELS;
     });
+  }
+
+  /**
+   * 元画像が大きすぎないか。
+   *
+   * トラッカーが見るのは**どんなに大きくても画面上250px程度**。それより上の
+   * 距離帯は .iset と .fset3 に入るのに一度も使われない。
+   * 実例: 7370x4961 だと距離帯が24段できるが、狙う的に入るのは2段だけで、
+   * 残り22段はファイルを膨らませるだけ。生成にも等倍で160秒かかる。
+   * @returns {number|null} 縮めたほうがよければ推奨する幅(px)、問題なければ null
+   */
+  function tooBig(W, H) {
+    if (W * H <= 4e6) return null;        // 400万画素までは気にしない
+    // 狙う的の上（250px）から2倍ぶんの余裕を見て、1000px あれば十分
+    return 1000;
   }
 
   /** ニアレストネイバーで整数倍に拡大する（なめらかにしてはいけない） */
@@ -264,7 +285,7 @@
 
   var API = { SCALES: SCALES, LEVELS: LEVELS, DISTANCES: DISTANCES,
               SPREAD_STEP: SPREAD_STEP, KB_STEP: KB_STEP, MAX_PIXELS: MAX_PIXELS,
-              upscale: upscale, usableScales: usableScales,
+              upscale: upscale, usableScales: usableScales, tooBig: tooBig,
               score: score, search: search, pick: pick, better: better };
   if (typeof module === 'object' && module.exports) module.exports = API;
   else root.Search = API;
