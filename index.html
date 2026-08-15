@@ -8,7 +8,7 @@
 <!-- js / css を更新したら ?v= の数字を1つ上げる。
      GitHub Pages は10分キャッシュするため、これが無いと利用者の手元で
      古いファイルと新しいファイルが混ざって画面が壊れることがある -->
-<link rel="stylesheet" href="css/style.css?v=35">
+<link rel="stylesheet" href="css/style.css?v=36">
 </head>
 <body>
 
@@ -182,6 +182,8 @@
 <section id="step-result" hidden>
   <h2 data-i18n="step3.title">Verdict</h2>
   <div id="verdicts"></div>
+  <details class="folded" id="bands-fold">
+    <summary data-i18n="tbl.fold">Show the band-by-band breakdown</summary>
   <table id="bands">
     <caption data-i18n="tbl.caption">Tracking points per distance band. A band's pixel width is
       the same number as the width the marker has on the tracker's canvas, so it doubles as
@@ -197,12 +199,15 @@
     <tbody></tbody>
   </table>
   <p class="hint" id="basis"></p>
+  </details>
 </section>
 
 <!-- ============ 5. Distance ============ -->
 <section id="step-distance" hidden>
   <h2 data-i18n="dist.title">How far away it still works</h2>
   <div id="dist-summary"></div>
+  <details class="folded" id="dist-fold">
+    <summary data-i18n="dist.fold">Show the distance-by-distance breakdown</summary>
   <table id="dist">
     <thead><tr>
       <th data-i18n="dist.col">Distance</th>
@@ -215,6 +220,7 @@
      (640×480, fx=609.4, so 55.4° across the long axis). A different lens shifts every distance
      proportionally. Closer than the fit distance the marker runs off the frame, so the counts
      there are optimistic.</p>
+  </details>
 </section>
 
 <!-- ============ 6. Heatmap ============ -->
@@ -256,6 +262,8 @@
 
 </main>
 
+<button type="button" id="prose-toggle" data-i18n="btn.prose">Show the explanations</button>
+
 <footer>
   <p data-i18n="foot.credit">The generator is the unmodified build from
      <a href="https://github.com/Carnaux/NFT-Marker-Creator">Carnaux/NFT-Marker-Creator</a> (MIT),
@@ -266,14 +274,14 @@
      <a href="https://github.com/kidsnz/ar-marker-studio" data-i18n="foot.source">Source</a></p>
 </footer>
 
-<script src="js/i18n.js?v=35"></script>
-<script src="js/png.js?v=35"></script>
-<script src="js/engine.js?v=35"></script>
-<script src="js/fset3.js?v=35"></script>
-<script src="js/heatmap.js?v=35"></script>
-<script src="js/fset.js?v=35"></script>
-<script src="js/generate.js?v=35"></script>
-<script src="js/search.js?v=35"></script>
-<script src="js/app.js?v=35"></script>
+<script src="js/i18n.js?v=36"></script>
+<script src="js/png.js?v=36"></script>
+<script src="js/engine.js?v=36"></script>
+<script src="js/fset3.js?v=36"></script>
+<script src="js/heatmap.js?v=36"></script>
+<script src="js/fset.js?v=36"></script>
+<script src="js/generate.js?v=36"></script>
+<script src="js/search.js?v=36"></script>
+<script src="js/app.js?v=36"></script>
 </body>
 </html>

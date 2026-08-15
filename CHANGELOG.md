@@ -3,6 +3,18 @@
 このファイルの書き方は [Keep a Changelog](https://keepachangelog.com/ja/1.1.0/)、
 バージョンの付け方は [Semantic Versioning](https://semver.org/lang/ja/) に従う。
 
+## [2.7.0] - 2026-08-15
+
+### 変更
+- **ページを短くした。** 画面4.4個分あったのを3.8個分に。
+  数字だけ見たい場面が大半なので、長い解説は既定で伏せる
+  - 右下の「説明を表示」で全部戻る（選んだら覚える）
+  - **散らばりの物差し**（1%=飛ぶ / 17%=ほぼ安定 / 33%=安定）だけは伏せない。
+    これが無いと判定に出ている「散らばり 21.3%」の良し悪しが判断できない
+  - 詳細設定の中の説明も伏せない（そこは触っているときにしか開かない）
+- 距離帯の表と距離の表を畳んだ（要約の行は出したまま）
+- ヒートマップは畳まない
+
 ## [2.6.0] - 2026-08-15
 
 ### 追加
@@ -317,6 +329,7 @@ Python の `zipfile` と macOS の `unzip` の両方で開けること、
 - 本物の生成器をブラウザ内で走らせる生成機能
 - 英語・日本語の切り替え
 
+[2.7.0]: https://github.com/kidsnz/ar-marker-studio/compare/v2.6.0...v2.7.0
 [2.6.0]: https://github.com/kidsnz/ar-marker-studio/compare/v2.5.0...v2.6.0
 [2.5.0]: https://github.com/kidsnz/ar-marker-studio/compare/v2.4.0...v2.5.0
 [2.4.0]: https://github.com/kidsnz/ar-marker-studio/compare/v2.3.0...v2.4.0

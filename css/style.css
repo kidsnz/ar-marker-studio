@@ -252,6 +252,26 @@ tr.used td:first-child::after { content: " ←"; }
 #search-table { min-width: 44rem; }
 #search-table td, #search-table th { white-space: nowrap; }
 
+/* --- 長い説明を畳む ---
+   数字だけ見たい場面が大半なので、既定では解説を伏せる。
+   ただし**散らばりの物差し**（1%=飛ぶ / 17%=ほぼ安定 / 33%=安定）だけは残す。
+   これが無いと、判定に出ている「散らばり 21.3%」の良し悪しが判断できない。
+   設定の中の説明も、そこは触っているときにしか開かないので伏せない */
+body:not(.show-prose) main .hint,
+body:not(.show-prose) main caption,
+body:not(.show-prose) main #basis { display: none; }
+body:not(.show-prose) #verdicts .hint,
+body:not(.show-prose) #step-config .hint,
+body:not(.show-prose) #step-config .sub { display: block; }
+
+#prose-toggle {
+  position: fixed; right: 1rem; bottom: 1rem; z-index: 10;
+  border: 2px dashed var(--accent-soft); border-radius: 999px;
+  padding: 0.4rem 1rem; background: var(--bg); color: var(--accent);
+}
+details.folded { margin: 0.6rem 0 0; }
+details.folded > summary { color: var(--accent); cursor: pointer; }
+
 /* --- ヒートマップ --- */
 .panels { display: grid; grid-template-columns: repeat(auto-fit, minmax(300px, 1fr)); gap: 1.4rem; }
 figure { margin: 0; }

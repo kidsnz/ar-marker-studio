@@ -62,6 +62,8 @@
     'why.small': 'Gives up one distance ({c}/{n}) to save {d} KB against the balanced choice.',
     'why.small.eq': 'Same {c}/{n} distances but spread {s}% instead of {s2}%, {d} KB smaller.',
     'why.small.same': 'Nothing smaller was worth taking, so the balanced choice is also the smallest.',
+    'btn.prose': 'Show the explanations',
+    'btn.proseHide': 'Hide the explanations',
     'btn.use': 'Use these settings',
     'btn.dlAll': '\u25bc all three',
     'pick.applied': 'Applied. The working image is now {k}× and -dpi/-level are filled in. '
@@ -973,6 +975,7 @@
   /** 生成された .fset を読んで、予測と合っていたかを確かめる */
   // 言語を切り替えたら、動的に組み立てた部分も描き直す
   self.onI18nChange = function () {
+    if (self.onProseLabel) self.onProseLabel();
     if (state.rgba) showImage();
     if (search.picks) showPicks();
     if (state.result) showResult();
@@ -1000,6 +1003,24 @@
     sel.addEventListener('change', function () {
       apply(sel.value);
       try { localStorage.setItem('ams-theme', sel.value); } catch (e) { /* 無視 */ }
+    });
+  })();
+
+  // 長い説明の開閉。選んだら覚える
+  (function () {
+    var b = $('prose-toggle');
+    var on = false;
+    try { on = localStorage.getItem('ams-prose') === '1'; } catch (e) { /* 無視 */ }
+    function apply() {
+      document.body.classList.toggle('show-prose', on);
+      b.textContent = t(on ? 'btn.proseHide' : 'btn.prose');
+    }
+    apply();
+    self.onProseLabel = apply;      // 言語を切り替えたら文言も直す
+    b.addEventListener('click', function () {
+      on = !on;
+      apply();
+      try { localStorage.setItem('ams-prose', on ? '1' : '0'); } catch (e) { /* 無視 */ }
     });
   })();
 
