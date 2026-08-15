@@ -3,6 +3,26 @@
 このファイルの書き方は [Keep a Changelog](https://keepachangelog.com/ja/1.1.0/)、
 バージョンの付け方は [Semantic Versioning](https://semver.org/lang/ja/) に従う。
 
+## [2.5.0] - 2026-08-15
+
+### 追加
+- **Generate を押すと3ファイルが1つの .zip でそのまま落ちるようになった。**
+  マーカーは `.fset` / `.fset3` / `.iset` が3つ揃って初めて使えるのに、
+  これまではリンクを3回押させていた
+- おすすめの札にも「3つまとめて(.zip)」を足した
+
+### なぜ ZIP にしたか
+最初は3つを少しずつ間を空けて個別に落とす実装にしたが、**実測すると Chrome が
+2つ目以降を黙って捨て、1つしか届かなかった**（`.fset` だけ）。
+「複数ファイルのダウンロードを許可」を利用者に押させる作りにもしたくない。
+ZIP なら1ファイルなので必ず届く。中身は既に圧縮済み（`.iset` は JPEG、
+`.fset3` はバイナリ）なので、無圧縮で入れても大きさはほとんど変わらない
+（実測 84,709 バイト → 85,033 バイト、+0.4%）。
+
+外部ライブラリは使わず、無圧縮 ZIP を60行ほどで自前で書いた。
+Python の `zipfile` と macOS の `unzip` の両方で開けること、
+中身3つが元と SHA256 まで一致することを確認済み。
+
 ## [2.4.0] - 2026-08-15
 
 ### 変更
@@ -283,6 +303,7 @@
 - 本物の生成器をブラウザ内で走らせる生成機能
 - 英語・日本語の切り替え
 
+[2.5.0]: https://github.com/kidsnz/ar-marker-studio/compare/v2.4.0...v2.5.0
 [2.4.0]: https://github.com/kidsnz/ar-marker-studio/compare/v2.3.0...v2.4.0
 [2.3.0]: https://github.com/kidsnz/ar-marker-studio/compare/v2.2.0...v2.3.0
 [2.2.0]: https://github.com/kidsnz/ar-marker-studio/compare/v2.1.2...v2.2.0

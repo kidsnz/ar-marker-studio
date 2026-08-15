@@ -62,6 +62,7 @@
     'why.small.eq': 'Same {c}/{n} distances but spread {s}% instead of {s2}%, {d} KB smaller.',
     'why.small.same': 'Nothing smaller was worth taking, so the balanced choice is also the smallest.',
     'btn.use': 'Use these settings',
+    'btn.dlAll': '\u25bc all three (.zip)',
     'pick.applied': 'Applied. The working image is now {k}× and -dpi/-level are filled in. '
       + 'The three files are generated already, so the buttons above download them as they are.',
 
@@ -113,7 +114,7 @@
       + ' / {n} points selected (cap {max2})',
     'gen.loading': 'Loading the generator… (about 1MB, first time only)',
     'gen.running': 'Generating… {t}',
-    'gen.done': 'Done in {s}s. Keep all three files in the same folder.',
+    'gen.done': 'Done in {s}s. All three files come down as one .zip \u2014 unzip it and keep them together. Browsers quietly drop the 2nd and 3rd of three separate downloads, so one archive is the only way they all arrive. The links below fetch them individually.',
     'gen.match': 'Prediction matched the real output across all {n} bands.',
     'gen.mismatch': 'Prediction differed in {d} of {n} bands (actual: [{got}]). '
       + 'On flat artwork the generator\'s own rounding can shift things by a few percent.',
@@ -519,6 +520,8 @@
       + profileHtml(r)
       + '<p class="row pick-actions">'
       + '<button type="button" data-card="' + i + '" data-act="use">' + t('btn.use') + '</button>'
+      + '<button type="button" data-card="' + i + '" data-act="all">'
+      + t('btn.dlAll') + '</button>'
       + ['fset', 'fset3', 'iset'].map(function (ext) {
           return '<button type="button" data-card="' + i + '" data-act="' + ext + '">▼ .'
             + ext + '</button>';
@@ -599,6 +602,7 @@
     var card = search.cards[+b.dataset.card];
     if (!card) return;
     if (b.dataset.act === 'use') applyPick(card, b);
+    else if (b.dataset.act === 'all') Generator.downloadAll(card.r.files, fileBase());
     else Generator.download(card.r.files[b.dataset.act],
                             fileBase() + '.' + b.dataset.act);
   });
@@ -939,6 +943,8 @@
         state.detect = FSet3.parse(out.fset3);
         if (state.detect) showResult();
       } catch (e) { state.detect = null; }
+      // 3つ揃って初めて使えるものなので、押したらそのまま3つとも落とす
+      Generator.downloadAll(out, name);
       var links = $('genlinks');
       links.innerHTML = '';
       [['fset', out.fset], ['fset3', out.fset3], ['iset', out.iset]].forEach(function (e) {
