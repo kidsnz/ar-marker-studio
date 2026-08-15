@@ -73,6 +73,7 @@
     'res.coverYes': '<strong>Good for all three uses.</strong> It holds 3 or more points everywhere in the target, so the same files work on a painting, on a sticker and on a laptop screen.',
     'res.coverNo': '<strong>Does not cover the whole target.</strong> Tracking stops at {n} of the {total} sampled sizes \u2014 for this printed size that is {from} to {to} away. Scale the artwork up before generating, or print the marker larger.',
     'res.coverWeak': '<strong>It tracks everywhere, but not steadily.</strong> At {n} of the {total} sampled sizes the points span less than {ss}% of the marker \u2014 worst at {at}, with {p} points spanning {s}%. Measured on real devices that is where the pose drifts. Scale the artwork up before generating.',
+    'res.thinNote': 'The thinnest spot is {at}, with {p} points spanning {s}%. That is only worth watching \u2014 measured against real devices, spread on its own has not predicted anything so far; the 3-point floor has.',
     'pick.coverYes': 'Covers all three uses',
     'pick.coverNo': 'Covers {n} of {total} in the target',
     'res.detailCrop': 'spread {spread}% / the marker is bigger than the frame, so only the middle {vis}% counts ({all} points in total) / {fb} with the runtime fallback',
@@ -473,7 +474,7 @@
   function cardHtml(c, i) {
     var r = c.r;
     var all = r.profile.length > 0 && r.profile.every(function (q) {
-      return q.points >= Engine.TRACK_MIN && q.spread >= Engine.STABLE_SPREAD;
+      return q.points >= Engine.TRACK_MIN;
     });
     return '<div class="pick">'
       + '<h3>' + c.roles.map(function (k) { return t(k); }).join(' / ') + '</h3>'
@@ -792,18 +793,16 @@
         from: fmtMm(dead[0].mm), to: fmtMm(dead[dead.length - 1].mm)
       }) + '</p>';
     }
-    // 動くが不安定… **散らばり**が実測の目安を割っている。
-    // 点数では見ない（11点で散らばり30%の実機で問題ないものを落としてしまう）
-    var weak = ds.filter(function (d) { return d.spread < Engine.STABLE_SPREAD; });
-    if (weak.length) {
-      var worst = weak.reduce(function (a, b) { return a.spread <= b.spread ? a : b; });
-      return '<p class="warn">' + t('res.coverWeak', {
-        n: weak.length, total: ds.length, at: fmtMm(worst.mm),
-        p: worst.points, s: (worst.spread * 100).toFixed(1),
-        ss: Math.round(Engine.STABLE_SPREAD * 100)
-      }) + '</p>';
-    }
-    return '<p class="ok">' + t('res.coverYes') + '</p>';
+    // ここを通れば合格。**散らばりで足切りはしない。**
+    // 実機で答えが分かっている7例のうち、不安定だったのは3点を割っていた1本だけで、
+    // 安定なものの散らばりは 1.8%〜22.4% とばらばらだった（engine.js の注記を参照）。
+    // 散らばりは参考として、いちばん小さい値だけ添える
+    var thin = ds.reduce(function (a, b) { return a.spread <= b.spread ? a : b; });
+    return '<p class="ok">' + t('res.coverYes')
+      + (thin.spread < Engine.STABLE_SPREAD
+          ? ' ' + t('res.thinNote', { at: fmtMm(thin.mm), p: thin.points,
+                                      s: (thin.spread * 100).toFixed(1) })
+          : '') + '</p>';
   }
 
   /**
