@@ -100,6 +100,10 @@ code { background: var(--panel); padding: 0 0.25em; }
 .stagemid { flex: 0 1 320px; text-align: center; }
 .stagefoot { margin: 0.7rem 0 0; text-align: center; }
 .stagestat { justify-content: center; min-height: 1.4em; margin-top: 1rem; }
+/* 進捗と結論は、上の3列で画面が埋まっても見えるように目立たせる */
+.stagestat span { color: var(--accent); }
+#topverdict { max-width: 780px; margin: 0.6rem auto 0; }
+#topverdict .ok, #topverdict .warn { margin: 0; }
 
 #drop {
   border: 2px dashed var(--line);

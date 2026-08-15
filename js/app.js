@@ -292,6 +292,7 @@
     $('genresult').hidden = true;
     $('genstat').textContent = '';
     $('progress').textContent = '';
+    $('topverdict').innerHTML = '';
     $('fill-dist').textContent = '';
     ['step-search', 'step-result', 'step-distance', 'step-heatmap']
       .forEach(function (s2) { $(s2).hidden = true; });
@@ -712,9 +713,6 @@
         w: r.W, h: r.H, dpi: +r.dpi.toFixed(2), level: r.level,
         mw: ev.widthMm.toFixed(0), mh: ev.heightMm.toFixed(0)
       }) + '</p>'
-      + coversAll(distances().map(function (z) {
-          return Engine.atDistance(r.bands, ev.widthMm, ev.heightMm, z);
-        }))
       + distances(3).map(function (z) {
           return verdictRow(Engine.atDistance(r.bands, ev.widthMm, ev.heightMm, z));
         }).join('')
@@ -773,6 +771,11 @@
     } else if (!state.detect && detTh) {
       detTh.remove();
     }
+
+    // 結論は上（スクロールせずに見える位置）に出す
+    $('topverdict').innerHTML = coversAll(distances().map(function (z) {
+      return Engine.atDistance(r.bands, ev.widthMm, ev.heightMm, z);
+    }));
 
     $('basis').textContent = t('res.basis');
     // 計算を飛ばした帯があるなら、黙って落とさずその場で言う
