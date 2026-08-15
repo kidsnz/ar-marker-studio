@@ -31,7 +31,7 @@
     'meta.rgb': 'colour → converted with (r+g+b)/3',
     'meta.png': 'PNG (decoded here, so values match the generator exactly)',
     'meta.jpeg': 'JPEG (decoded by canvas; values differ slightly from the generator)',
-    'cfg.fillIs': '\u2192 fills {near}\u2013{far}% of the screen ({npx}\u2013{fpx}px across)',
+    'cfg.standAt': '\u2192 use it from {near} to {far} away (that is where it spans {lo}\u2013{hi}px, the target)',
     'meta.scale': 'Upscaled',
     'meta.scaleV': '{k}× nearest-neighbour (source was {w}×{h})',
 
@@ -70,6 +70,11 @@
     'res.apparent': 'apparent {n} dpi →',
     'res.points': 'points',
     'res.onScreen': '{px}px across on the tracker\u2019s canvas \u2192',
+    'res.coverYes': '<strong>Good for all three uses.</strong> It holds 3 or more points everywhere in the target, so the same files work on a painting, on a sticker and on a laptop screen.',
+    'res.coverNo': '<strong>Does not cover the whole target.</strong> Tracking stops at {n} of the {total} sampled sizes \u2014 for this printed size that is {from} to {to} away. Scale the artwork up before generating, or print the marker larger.',
+    'res.coverWeak': '<strong>It tracks everywhere, but not steadily.</strong> At {n} of the {total} sampled sizes the points span less than {ss}% of the marker \u2014 worst at {at}, with {p} points spanning {s}%. Measured on real devices that is where the pose drifts. Scale the artwork up before generating.',
+    'pick.coverYes': 'Covers all three uses',
+    'pick.coverNo': 'Covers {n} of {total} in the target',
     'res.detailCrop': 'spread {spread}% / the marker is bigger than the frame, so only the middle {vis}% counts ({all} points in total) / {fb} with the runtime fallback',
     'res.summary': 'Source {w}×{h} / -dpi={dpi} / -level={level} → printed {mw}×{mh} mm',
     'tbl.tooClose': 'too close, the marker runs off the frame',
@@ -257,44 +262,49 @@
   Array.prototype.forEach.call(document.querySelectorAll('button.use'), function (b) {
     b.addEventListener('click', function () {
       $('size-mm').value = b.dataset.mm;
-      $('dist-near').value = b.dataset.near;
-      $('dist-far').value = b.dataset.far;
       syncDpiFromMm();
       showFill();
     });
   });
-  ['size-mm', 'dist-near', 'dist-far'].forEach(function (id) {
-    $(id).addEventListener('input', showFill);
-  });
+  $('size-mm').addEventListener('input', showFill);
 
-  /** その距離だとマーカーが画面の何割を占めるかを、入力欄の横に出す */
+  /** 狙う的を、その実寸だと「どこに立てばいいか」に直して出す */
   function showFill() {
     var mm = parseFloat($('size-mm').value);
     if (!(mm > 0)) { $('fill-dist').textContent = ''; return; }
-    var zs = distances(2), f = Engine.focalPx(Engine.REGION_PORTRAIT);
-    var vis = Engine.REGION_PORTRAIT[0];
-    var a = f * mm / zs[0] / vis, b2 = f * mm / zs[zs.length - 1] / vis;
-    $('fill-dist').textContent = t('cfg.fillIs', {
-      near: Math.round(a * 100), far: Math.round(b2 * 100),
-      npx: Math.round(a * vis), fpx: Math.round(b2 * vis)
+    var zs = distances(2);
+    $('fill-dist').textContent = t('cfg.standAt', {
+      near: fmtMm(zs[0]), far: fmtMm(zs[zs.length - 1]),
+      lo: TARGET_PX[0], hi: TARGET_PX[TARGET_PX.length - 1]
     });
   }
 
   /**
-   * 採点に使う距離(mm)の並び。入力欄は cm で受ける。
-   * 「画面幅の何割」ではなく実際の距離で考える。使う人が知っているのはそちらだから
+   * **狙う的**。マーカーがトラッカーの画布上に写る幅(px)。
+   *
+   * 実測（2026-08-15）で、3つの使い方が全部ここに来ることが分かった:
+   *   ステッカー 5.5cm を 7.6〜8.9cm から … 188〜221px
+   *   絵 72インチ を 2.92m から          … 191px
+   *   ラップトップ画面 12cm を 18〜22cm から … 166〜203px
+   * 実測の幅は 185〜225px だが、余裕を見て 150〜250px で採点する。
+   *
+   * **この的は実寸にも距離にも依らない。** 一定なのは構え方（画面いっぱい〜
+   * 少しはみ出すまで寄る）で、実寸は「どこに立つか」を決めているだけ。
+   * だから的は3つではなく1つで、距離の方をここから逆算して出す。
    */
+  var TARGET_PX = [150, 175, 200, 225, 250];
+
+  /** 的の px を、その実寸での距離(mm)に直す。z = 焦点距離 × 実寸 ÷ 画面上の幅 */
   function distances(n) {
-    var a = parseFloat($('dist-near').value) * 10;
-    var b = parseFloat($('dist-far').value) * 10;
-    if (!(a > 0)) a = 1500;
-    if (!(b > 0)) b = a;
-    if (b < a) { var t = a; a = b; b = t; }
-    n = n || 5;
-    if (n === 1 || a === b) return [Math.round(a)];
-    var out = [];
-    for (var i = 0; i < n; i++) out.push(Math.round(a + (b - a) * i / (n - 1)));
-    return out;
+    var mm = parseFloat($('size-mm').value);
+    if (!(mm > 0)) mm = 305;
+    var f = Engine.focalPx(Engine.REGION_PORTRAIT);
+    var px = TARGET_PX;
+    if (n === 3) px = [TARGET_PX[0], TARGET_PX[2], TARGET_PX[4]];
+    else if (n === 2) px = [TARGET_PX[0], TARGET_PX[4]];
+    // px が大きい = 近い。距離の昇順（遠い順）に並べ替えて返す
+    return px.map(function (p) { return Math.round(f * mm / p); })
+             .sort(function (a, b) { return a - b; });
   }
 
   // ------------------------------------------------------------------
@@ -462,8 +472,14 @@
 
   function cardHtml(c, i) {
     var r = c.r;
+    var all = r.profile.length > 0 && r.profile.every(function (q) {
+      return q.points >= Engine.TRACK_MIN && q.spread >= Engine.STABLE_SPREAD;
+    });
     return '<div class="pick">'
       + '<h3>' + c.roles.map(function (k) { return t(k); }).join(' / ') + '</h3>'
+      + '<p class="' + (all ? 'ok' : 'warn') + '">'
+      + t(all ? 'pick.coverYes' : 'pick.coverNo',
+          { n: r.coverage, total: r.profile.length }) + '</p>'
       + '<p class="pick-set">' + t('pick.set', { k: r.scale, lv: r.level,
                                                  dpi: r.dpi, w: r.W, h: r.H }) + '</p>'
       + c.roles.map(function (k) {
@@ -665,6 +681,9 @@
         w: r.W, h: r.H, dpi: +r.dpi.toFixed(2), level: r.level,
         mw: ev.widthMm.toFixed(0), mh: ev.heightMm.toFixed(0)
       }) + '</p>'
+      + coversAll(distances().map(function (z) {
+          return Engine.atDistance(r.bands, ev.widthMm, ev.heightMm, z);
+        }))
       + distances(3).map(function (z) {
           return verdictRow(Engine.atDistance(r.bands, ev.widthMm, ev.heightMm, z));
         }).join('')
@@ -758,6 +777,33 @@
       .forEach(function (s) { $(s).hidden = false; });
     $('name').value = state.name;
     drawHeatmap();
+  }
+
+  /**
+   * 狙う的（150〜250px）を全部満たしているか。
+   * 満たしていれば、絵でもステッカーでもサイトでもそのまま使える
+   */
+  function coversAll(ds) {
+    // 追従が成立しない（3点未満）… そもそも使えない
+    var dead = ds.filter(function (d) { return d.points < Engine.TRACK_MIN; });
+    if (dead.length) {
+      return '<p class="warn">' + t('res.coverNo', {
+        n: dead.length, total: ds.length,
+        from: fmtMm(dead[0].mm), to: fmtMm(dead[dead.length - 1].mm)
+      }) + '</p>';
+    }
+    // 動くが不安定… **散らばり**が実測の目安を割っている。
+    // 点数では見ない（11点で散らばり30%の実機で問題ないものを落としてしまう）
+    var weak = ds.filter(function (d) { return d.spread < Engine.STABLE_SPREAD; });
+    if (weak.length) {
+      var worst = weak.reduce(function (a, b) { return a.spread <= b.spread ? a : b; });
+      return '<p class="warn">' + t('res.coverWeak', {
+        n: weak.length, total: ds.length, at: fmtMm(worst.mm),
+        p: worst.points, s: (worst.spread * 100).toFixed(1),
+        ss: Math.round(Engine.STABLE_SPREAD * 100)
+      }) + '</p>';
+    }
+    return '<p class="ok">' + t('res.coverYes') + '</p>';
   }
 
   /**

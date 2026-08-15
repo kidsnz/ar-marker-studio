@@ -110,6 +110,22 @@
   // これは目安として弱い（TRACK_MIN=3 だけはソースで裏が取れている別物）
   var GOOD = 12, POOR = 5;
 
+  /**
+   * 「ほぼ安定」と言える散らばりの下限。
+   *
+   * **点数ではなく散らばりで判定する。** 既知の5例が散らばり単独で全部分かれる:
+   *   satoshi/03    14点 / 33.0%  … 安定
+   *   pizzaboy/07   11点 / 30.6%  … 実機で問題なし
+   *   satoshi/02     9点 / 17.0%  … ほぼ安定
+   *   emoticons/01   5点 / 11.9%  … 実機でふわふわ揺れる
+   *   satoshi/01     3点 /  1.0%  … 大小に飛ぶ
+   * 点数を条件に入れると pizzaboy/07（11点）が落ちてしまう。散らばりなら落ちない。
+   * ar2SelectTemplate が最大化しているのは四角形の面積そのものなので、
+   * 「点数より散らばり」というこのツールの原則とも一致する。
+   * 3点の下限（TRACK_MIN）だけは別で、そこを切ると追従自体が止まる。
+   */
+  var STABLE_SPREAD = 0.17;
+
   // --- 実行時（追従）の仕様。lib/SRC/AR2/tracking.c と selectTemplate.c より ---
   // これらは「点が何点あればいいのか」を決めている本体なので、判定に反映する。
   // 【注意】ARToolKit5 の既定値をそのまま使ってはいけない。実際に動いている
@@ -867,7 +883,7 @@
     REGION_PORTRAIT_LETTERBOX: REGION_PORTRAIT_LETTERBOX,
     VISIBLE_PORTRAIT: VISIBLE_PORTRAIT, VISIBLE_LANDSCAPE: VISIBLE_LANDSCAPE,
     visibleFraction: visibleFraction, regionFor: regionFor,
-    GOOD: GOOD, POOR: POOR,
+    GOOD: GOOD, POOR: POOR, STABLE_SPREAD: STABLE_SPREAD,
     TRACK_MIN: TRACK_MIN, TRACK_PER_FRAME: TRACK_PER_FRAME, EDGE_MARGIN: EDGE_MARGIN,
     toBW: toBW, dpiLevels: dpiLevels, scaleImage: scaleImage, bandRanges: bandRanges,
     featureMap: featureMap, selectFeatures: selectFeatures, predict: predict,

@@ -153,6 +153,13 @@ button.primary[disabled] {
   border-left: 2px solid var(--line); margin: 0.35rem 0 0.6rem 1.2rem;
 }
 .note.v-bad { border-left-color: var(--bad); }
+.ok {
+  border-left: 3px solid var(--good);
+  background: var(--panel);
+  padding: 0.7rem 1rem;
+  margin-top: 1rem;
+}
+.pick .ok, .pick .warn { margin: 0 0 0.5rem; padding: 0.35rem 0.6rem; font-size: 0.9em; }
 .v-good { color: var(--good); }
 .v-mid { color: var(--warn); }
 .v-bad { color: var(--bad); }
