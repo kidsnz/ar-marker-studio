@@ -8,7 +8,7 @@
 <!-- js / css を更新したら ?v= の数字を1つ上げる。
      GitHub Pages は10分キャッシュするため、これが無いと利用者の手元で
      古いファイルと新しいファイルが混ざって画面が壊れることがある -->
-<link rel="stylesheet" href="css/style.css?v=21">
+<link rel="stylesheet" href="css/style.css?v=22">
 </head>
 <body>
 
@@ -82,8 +82,8 @@
     </label>
   </div>
   <p class="preset"><span data-i18n="cfg.uses">Where will it be used?</span>
-    <button type="button" class="use" data-mm="1829" data-near="250" data-far="300"
-      data-i18n="cfg.uPaint">Painting 72in, from 2.5&ndash;3m</button>
+    <button type="button" class="use" data-mm="1829" data-near="270" data-far="310"
+      data-i18n="cfg.uPaint">Painting 72in, from 2.7&ndash;3.1m</button>
     <button type="button" class="use" data-mm="120" data-near="18" data-far="22"
       data-i18n="cfg.uScreen">On a laptop screen 12cm, from 18&ndash;22cm</button>
     <button type="button" class="use" data-mm="55" data-near="7.5" data-far="9"
@@ -91,14 +91,15 @@
   </p>
   <p class="row">
     <label for="dist-near" data-i18n="cfg.dist">Viewing distance</label>
-    <input type="number" id="dist-near" min="1" step="0.5" value="250"> &ndash;
-    <input type="number" id="dist-far" min="1" step="0.5" value="300"> cm
+    <input type="number" id="dist-near" min="1" step="0.5" value="270"> &ndash;
+    <input type="number" id="dist-far" min="1" step="0.5" value="310"> cm
     <span id="fill-dist" class="hint"></span>
   </p>
   <p class="hint" data-i18n="cfg.dist.sub">What the tracker actually sees is how much of the screen
     the marker fills, shown next to the distance. Measured on the real setup, all three uses land in
     <strong>the same place</strong>: about 100&ndash;120% of the screen width, roughly 185&ndash;225px
-    across. A 5.5cm sticker at 8cm and a 72in painting at 2.7m arrive at the tracker the same size,
+    across &mdash; all three measured on the real setup. A 5.5cm sticker at 8cm and a 72in painting
+    at 2.9m arrive at the tracker the same size,
     because the framing is what stays constant &mdash; the printed size only decides where you stand.
     So there is one target to hit, not three.</p>
   <p class="preset"><span data-i18n="cfg.presets">Common sizes:</span>
@@ -260,14 +261,14 @@
      <a href="https://github.com/kidsnz/ar-marker-studio" data-i18n="foot.source">Source</a></p>
 </footer>
 
-<script src="js/i18n.js?v=21"></script>
-<script src="js/png.js?v=21"></script>
-<script src="js/engine.js?v=21"></script>
-<script src="js/fset3.js?v=21"></script>
-<script src="js/heatmap.js?v=21"></script>
-<script src="js/fset.js?v=21"></script>
-<script src="js/generate.js?v=21"></script>
-<script src="js/search.js?v=21"></script>
-<script src="js/app.js?v=21"></script>
+<script src="js/i18n.js?v=22"></script>
+<script src="js/png.js?v=22"></script>
+<script src="js/engine.js?v=22"></script>
+<script src="js/fset3.js?v=22"></script>
+<script src="js/heatmap.js?v=22"></script>
+<script src="js/fset.js?v=22"></script>
+<script src="js/generate.js?v=22"></script>
+<script src="js/search.js?v=22"></script>
+<script src="js/app.js?v=22"></script>
 </body>
 </html>
