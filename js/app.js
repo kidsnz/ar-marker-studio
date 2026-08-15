@@ -69,6 +69,10 @@
     'res.apparent': 'apparent {n} dpi →',
     'res.points': 'points',
     'res.summary': 'Source {w}×{h} / -dpi={dpi} / -level={level} → printed {mw}×{mh} mm',
+    'tbl.tooClose': 'too close, the marker runs off the frame',
+    'res.tooSmall': '{n} more bands are left out of the table: their image is {ts}px or '
+      + 'smaller, so the template does not fit and they can never hold a single point. '
+      + 'Checked against the real generator: every such band comes out at 0.',
     'res.skipped': '{n} of the {total} distance bands were not computed: they are only reached '
       + 'when the marker is larger than the screen. They are still in the generated .fset. '
       + 'Skipping them is what keeps this fast — measured on a 1920×1080 image, they were '
@@ -614,24 +618,39 @@
                                                     floor: Engine.TRACK_MIN }) + '</p>'
       + '<p class="hint">' + t('res.spreadNote') + '</p>';
 
-    var max = Math.max.apply(null, r.bands.map(function (b) { return b.points.length; })) || 1;
+    // 【この表の読み方】
+    // 帯の画像の幅(px) は、その帯を使うときに**トラッカーが見ているマーカーの幅**と
+    // 必ず一致する（どちらも dpi × 実寸インチ）。だから
+    //   帯の幅 > 画面に見えている幅(181px) … 近すぎてマーカーが画面からはみ出す
+    //   帯の幅 ≤ 181px かつ 3点以上          … ここが実際に使える窓
+    // 距離は帯の dpi だけで決まる（マーカーの実寸には依らない）
+    var focal = Engine.focalPx(Engine.REGION_PORTRAIT);
+    var apFill = ev.portrait.dpi;         // マーカーが画面いっぱいのときの見かけ dpi
+    var shown = r.bands.filter(function (b) { return !b.tooSmall; });
+    var hidden = r.bands.length - shown.length;
+
+    var max = Math.max.apply(null, shown.map(function (b) { return b.points.length; })) || 1;
     var tb = $('bands').querySelector('tbody');
-    tb.innerHTML = r.bands.map(function (b, i) {
-      // 実際に使う帯かどうかだけ印を付ける（縦持ちで判定する）
-      var used = b.mindpi <= ev.portrait.dpi && ev.portrait.dpi <= b.maxdpi;
-      var det = state.detect && state.detect.levels[i];
-      return '<tr class="' + (used ? 'used' : '') + '">'
-        + '<td>' + i + '</td>'
+    tb.innerHTML = shown.map(function (b) {
+      var fits = b.dpi <= apFill;                          // 画面に収まるか
+      var ok = fits && b.points.length >= Engine.TRACK_MIN; // ここが使える窓
+      var det = state.detect && state.detect.levels[b.index];
+      return '<tr class="' + (ok ? 'used' : '') + '">'
+        + '<td>' + b.index + '</td>'
         + '<td>' + b.W + '×' + b.H + '</td>'
-        + '<td>' + b.points.length + '</td>'
+        + '<td>' + fmtMm(focal * 25.4 / b.dpi) + '</td>'
+        + '<td class="' + (b.points.length >= Engine.TRACK_MIN ? '' : 'v-bad') + '">'
+        + b.points.length + '</td>'
         + (state.detect
             ? '<td class="' + (det && det.count ? '' : 'v-bad') + '">'
               + (det ? det.count : '-') + '</td>'
             : '')
         + '<td><span class="bar" style="width:' + (b.points.length / max * 100) + '%"></span>'
-        + (used ? '<span class="tag">' + t('res.usedBy') + '</span>' : '')
+        + (!fits ? '<span class="tag">' + t('tbl.tooClose') + '</span>'
+                 : (ok ? '<span class="tag">' + t('res.usedBy') + '</span>' : ''))
         + '</td></tr>';
     }).join('');
+    search.hiddenBands = hidden;
 
     // 検出列の見出しは、生成後にだけ出す
     var headRow = $('bands').querySelector('thead tr');
@@ -651,6 +670,9 @@
       $('basis').textContent += '  ' + t('res.skipped', { n: r.skipped,
                                                           total: r.bandsTotal });
     }
+    if (hidden) {
+      $('basis').textContent += '  ' + t('res.tooSmall', { n: hidden, ts: Engine.TS * 2 });
+    }
     if (state.detect) {
       var n = 0;
       r.bands.forEach(function (b, i) {
@@ -662,9 +684,10 @@
     }
 
     var sel = $('band');
-    sel.innerHTML = r.bands.map(function (b, i) {
-      return '<option value="' + i + '">'
-        + t('hm.opt', { i: i, dpi: b.dpi.toFixed(1), w: b.W, h: b.H, n: b.points.length })
+    sel.innerHTML = shown.map(function (b) {
+      return '<option value="' + b.index + '">'
+        + t('hm.opt', { i: b.index, dpi: b.dpi.toFixed(1), w: b.W, h: b.H,
+                        n: b.points.length })
         + '</option>';
     }).join('');
     sel.value = Engine.bandForDpi(r.bands, ev.portrait.dpi);

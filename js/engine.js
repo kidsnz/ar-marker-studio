@@ -582,6 +582,23 @@
       var img = i === 0 ? { bw: bw0, W: W0, H: H0 }
                         : scaleImage(bw0, W0, H0, dpis[0], dpis[i]);
       if (opts.onProgress) opts.onProgress(n, todo.length, img.W, img.H, dpis[i]);
+
+      // テンプレートは外周 TS(=22) を空けないと収まらない（featureMap の座標チェック）。
+      // 幅か高さが 44px 以下の帯は**構造的に必ず0点**なので、計算する意味が無い。
+      // 実測でも、公開中のマーカーで 44px 未満の帯は47段すべて0点だった。
+      // 帯そのものは残す（生成器は作るし、番号がずれると照合できなくなる）
+      if (img.W <= TS * 2 || img.H <= TS * 2) {
+        out.push({
+          index: i, dpi: dpis[i], mindpi: bands[i].mindpi, maxdpi: bands[i].maxdpi,
+          W: img.W, H: img.H, bw: img.bw,
+          points: [], maxFeatureNum: 0, occ: 0, extracted: 0, filtered: 0,
+          cand: new Int32Array(0), candVal: new Float64Array(0),
+          usable: new Int32Array(0),
+          tooSmall: true          // テンプレートが収まらない。点は原理的に置けない
+        });
+        continue;
+      }
+
       var fm = featureMap(img.bw, img.W, img.H);
       var sel = selectFeatures(fm, img.W, img.H, level);
       out.push({
