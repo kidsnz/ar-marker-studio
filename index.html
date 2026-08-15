@@ -8,7 +8,7 @@
 <!-- js / css を更新したら ?v= の数字を1つ上げる。
      GitHub Pages は10分キャッシュするため、これが無いと利用者の手元で
      古いファイルと新しいファイルが混ざって画面が壊れることがある -->
-<link rel="stylesheet" href="css/style.css?v=27">
+<link rel="stylesheet" href="css/style.css?v=29">
 </head>
 <body>
 
@@ -29,30 +29,26 @@
 
 <main>
 
-<!-- ============ 1. Image ============ -->
-<section id="step-image">
-  <h2 data-i18n="step1.title">1. Source image</h2>
-  <div id="drop" tabindex="0" role="button" aria-label="Choose an image">
-    <p data-i18n="drop.main"><strong>Drop an image here</strong>, or click to choose one</p>
-    <p class="hint" data-i18n="drop.hint">PNG recommended. JPEG works, but its pixel values differ slightly from the generator's.</p>
-    <input type="file" id="file" accept="image/png,image/jpeg" hidden>
-  </div>
-  <div id="imginfo" hidden>
-    <canvas id="preview"></canvas>
-    <dl id="imgmeta"></dl>
-  </div>
-  <p id="alpha-warn" class="warn" hidden data-i18n="alpha.warn">
-    <strong>This image has an alpha channel.</strong>
-    NFT-Marker-Creator corrupts RGBA PNGs: the picture ends up repeated sideways with its
-    tones inverted. Flatten the background to white (or any solid colour) and save as RGB
-    before generating.
-  </p>
-</section>
+<!-- ============ 本家と同じ3列（画像 / 設定 / Generate） ============ -->
+<section id="step-top">
+  <div class="stage">
+    <div class="stagecol">
+      <div id="drop" tabindex="0" role="button" aria-label="Choose an image">
+        <p data-i18n="drop.main"><strong>Drop an image here</strong>, or click to choose one</p>
+        <p class="hint" data-i18n="drop.hint">PNG recommended. JPEG works, but its pixel values differ slightly from the generator's.</p>
+        <canvas id="preview" hidden></canvas>
+        <input type="file" id="file" accept="image/png,image/jpeg" hidden>
+      </div>
+      <p class="stagefoot">
+        <button type="button" id="clear" hidden data-i18n="btn.clear">Clear image</button>
+      </p>
+    </div>
 
-<!-- ============ 2. Settings ============ -->
-<section id="step-config" hidden>
-  <h2 data-i18n="step2.title">2. Settings</h2>
-  <div class="grid">
+    <div class="stagemid">
+      <button type="button" id="opts-toggle" aria-expanded="false"
+        data-i18n="btn.opts">Advanced Options</button>
+      <div id="step-config" hidden>
+<div class="grid">
     <label><span data-i18n="cfg.width">Printed width</span>
       <span class="sub" data-i18n="cfg.width.sub">How wide the marker is when printed. This decides the dpi.</span>
       <span class="row"><input type="number" id="size-mm" min="1" step="1" value="305"> mm</span>
@@ -104,13 +100,42 @@
     <button type="button" class="mm" data-mm="210" data-i18n="cfg.p210">A4 portrait 210mm</button>
     <button type="button" class="mm" data-mm="100" data-i18n="cfg.p100">Postcard 100mm</button>
   </p>
-  <p><button type="button" id="run" class="primary" data-i18n="btn.run">Check quality</button>
-     <span id="progress" class="hint"></span></p>
+  <p class="row">
+    <label for="name" data-i18n="gen.name">File name</label>
+    <input type="text" id="name" value="marker" size="16">
+    <button type="button" id="run" data-i18n="btn.run">Check quality again</button>
+  </p>
+  <p class="hint" data-i18n="gen.hint">The real generator (ARToolKit5's genTexData) runs inside this
+     page. Nothing is sent to a server.</p>
+      </div>
+    </div>
+
+    <button type="button" id="gen" class="genpanel" disabled
+      data-i18n="btn.gen">Generate &amp; download</button>
+  </div>
+
+  <p class="row stagestat">
+    <span id="genstat" class="hint"></span>
+    <span id="progress" class="hint"></span>
+    <span id="search-progress" class="hint"></span>
+  </p>
+  <div id="genresult" hidden>
+    <p id="gensummary"></p>
+    <p id="genlinks" class="row"></p>
+    <p id="gencheck" class="hint"></p>
+  </div>
+  <dl id="imgmeta"></dl>
+  <p id="alpha-warn" class="warn" hidden data-i18n="alpha.warn">
+    <strong>This image has an alpha channel.</strong>
+    NFT-Marker-Creator corrupts RGBA PNGs: the picture ends up repeated sideways with its
+    tones inverted. Flatten the background to white (or any solid colour) and save as RGB
+    before generating.
+  </p>
 </section>
 
 <!-- ============ 3. Recommended settings ============ -->
 <section id="step-search" hidden>
-  <h2 data-i18n="search.title">3. Recommended settings</h2>
+  <h2 data-i18n="search.title">Recommended settings</h2>
   <p class="hint" data-i18n="search.hint">This starts on its own once an image is loaded. Each scale is
      generated for real and then scored, so the point counts and file sizes below are exact rather than
      estimated. Only <code>-level=4</code> is tried: it wins on quality every time, and the other levels
@@ -146,7 +171,7 @@
 
 <!-- ============ 4. Verdict ============ -->
 <section id="step-result" hidden>
-  <h2 data-i18n="step3.title">4. Verdict</h2>
+  <h2 data-i18n="step3.title">Verdict</h2>
   <div id="verdicts"></div>
   <table id="bands">
     <caption data-i18n="tbl.caption">Tracking points per distance band. A band's pixel width is
@@ -167,7 +192,7 @@
 
 <!-- ============ 5. Distance ============ -->
 <section id="step-distance" hidden>
-  <h2 data-i18n="dist.title">5. How far away it still works</h2>
+  <h2 data-i18n="dist.title">How far away it still works</h2>
   <div id="dist-summary"></div>
   <table id="dist">
     <thead><tr>
@@ -185,7 +210,7 @@
 
 <!-- ============ 6. Heatmap ============ -->
 <section id="step-heatmap" hidden>
-  <h2 data-i18n="step4.title">6. Where the artwork is weak</h2>
+  <h2 data-i18n="step4.title">Where the artwork is weak</h2>
   <p class="row">
     <label for="band" data-i18n="hm.band">Distance band</label>
     <select id="band"></select>
@@ -220,30 +245,6 @@
   </details>
 </section>
 
-<!-- ============ 7. Generate ============ -->
-<section id="step-generate" hidden>
-  <h2 data-i18n="step5.title">7. Generate the marker</h2>
-  <p class="hint" data-i18n="gen.hint">The real generator (ARToolKit5's genTexData) runs inside this page.
-     Nothing is sent to a server.</p>
-  <div class="genrow">
-    <div class="genfields">
-      <p class="row">
-        <label for="name" data-i18n="gen.name">File name</label>
-        <input type="text" id="name" value="marker" size="16">
-      </p>
-      <p id="genstat" class="hint"></p>
-      <p id="gen-blocked" class="hint" hidden data-i18n="gen.blocked">The search is using the generator
-        right now. Wait for it to finish, or press Stop above.</p>
-    </div>
-    <button type="button" id="gen" class="genpanel" data-i18n="btn.gen">Generate &amp; download</button>
-  </div>
-  <div id="genresult" hidden>
-    <p id="gensummary"></p>
-    <p id="genlinks" class="row"></p>
-    <p id="gencheck" class="hint"></p>
-  </div>
-</section>
-
 </main>
 
 <footer>
@@ -256,14 +257,14 @@
      <a href="https://github.com/kidsnz/ar-marker-studio" data-i18n="foot.source">Source</a></p>
 </footer>
 
-<script src="js/i18n.js?v=27"></script>
-<script src="js/png.js?v=27"></script>
-<script src="js/engine.js?v=27"></script>
-<script src="js/fset3.js?v=27"></script>
-<script src="js/heatmap.js?v=27"></script>
-<script src="js/fset.js?v=27"></script>
-<script src="js/generate.js?v=27"></script>
-<script src="js/search.js?v=27"></script>
-<script src="js/app.js?v=27"></script>
+<script src="js/i18n.js?v=29"></script>
+<script src="js/png.js?v=29"></script>
+<script src="js/engine.js?v=29"></script>
+<script src="js/fset3.js?v=29"></script>
+<script src="js/heatmap.js?v=29"></script>
+<script src="js/fset.js?v=29"></script>
+<script src="js/generate.js?v=29"></script>
+<script src="js/search.js?v=29"></script>
+<script src="js/app.js?v=29"></script>
 </body>
 </html>

@@ -3,6 +3,19 @@
 このファイルの書き方は [Keep a Changelog](https://keepachangelog.com/ja/1.1.0/)、
 バージョンの付け方は [Semantic Versioning](https://semver.org/lang/ja/) に従う。
 
+## [2.4.0] - 2026-08-15
+
+### 変更
+- **レイアウトを本家 NFT-Marker-Creator と同じ3列構造にした。**
+  v1.2.0 で「carnaux 版に寄せた」としていたが、実際にやったのは配色・点線枠・
+  Generate パネルの3点だけで、**構造には手をつけていなかった**。本家は
+  「画像を置く枠 ／ Advanced Options ／ Generate」が横に並んで1画面で完結するのに対し、
+  こちらは縦に長い7セクションの文書で、Generate は最下部にあった（正反対）
+  - 上に3列を置いた。画像はドロップ枠の中にそのまま表示し、下に「画像を消す」
+  - 設定は「詳細設定」で中央の列に開く（本家の Advanced Options と同じ位置）
+  - 独自の追加（おすすめ・判定・距離帯・ヒートマップ）は全部その下に並べる
+  - 見出しの番号を外した。順番に進む手順ではなく、結果が下に出る形になったため
+
 ## [2.3.0] - 2026-08-15
 
 ### 変更（判定基準の撤回）
@@ -270,6 +283,7 @@
 - 本物の生成器をブラウザ内で走らせる生成機能
 - 英語・日本語の切り替え
 
+[2.4.0]: https://github.com/kidsnz/ar-marker-studio/compare/v2.3.0...v2.4.0
 [2.3.0]: https://github.com/kidsnz/ar-marker-studio/compare/v2.2.0...v2.3.0
 [2.2.0]: https://github.com/kidsnz/ar-marker-studio/compare/v2.1.2...v2.2.0
 [2.1.1]: https://github.com/kidsnz/ar-marker-studio/compare/v2.1.0...v2.1.1

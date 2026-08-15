@@ -221,15 +221,17 @@
           : '')
       + row(t('meta.color'), t(info.nc === 1 ? 'meta.gray' : 'meta.rgb'))
       + row(t('meta.format'), t(state.isPNG ? 'meta.png' : 'meta.jpeg'));
-    $('imginfo').hidden = false;
+    $('preview').hidden = false;
+    $('drop').classList.add('has-image');
+    $('clear').hidden = false;
+    $('gen').disabled = false;
     $('alpha-warn').hidden = !info.hasAlpha;
 
-    $('step-config').hidden = false;
     $('step-search').hidden = false;
     $('name').value = state.name;
     syncDpiFromMm();
     // 作業中の画像が変わったので、前の判定は消す（step-distance の消し忘れがあった）
-    ['step-result', 'step-distance', 'step-heatmap', 'step-generate']
+    ['step-result', 'step-distance', 'step-heatmap']
       .forEach(function (s) { $(s).hidden = true; });
   }
 
@@ -268,6 +270,32 @@
     });
   });
   $('size-mm').addEventListener('input', showFill);
+
+  // Advanced Options（本家と同じく、中央の列で開く）
+  $('opts-toggle').addEventListener('click', function () {
+    var open = $('step-config').hidden;
+    $('step-config').hidden = !open;
+    $('opts-toggle').setAttribute('aria-expanded', String(open));
+  });
+
+  // 画像を捨てて最初の状態に戻す
+  $('clear').addEventListener('click', function () {
+    state.rgba = state.orig = null; state.result = state.detect = null; state.scale = 1;
+    clearSearch();
+    $('preview').hidden = true;
+    $('drop').classList.remove('has-image');
+    $('clear').hidden = true;
+    $('gen').disabled = true;
+    $('imgmeta').innerHTML = '';
+    $('alpha-warn').hidden = true;
+    $('genresult').hidden = true;
+    $('genstat').textContent = '';
+    $('progress').textContent = '';
+    $('fill-dist').textContent = '';
+    ['step-search', 'step-result', 'step-distance', 'step-heatmap']
+      .forEach(function (s2) { $(s2).hidden = true; });
+    $('file').value = '';
+  });
 
   /** 狙う的を、その実寸だと「どこに立てばいいか」に直して出す */
   function showFill() {
@@ -365,7 +393,6 @@
     $('search-stop').hidden = false;
     // 生成ワーカーは1つしかないので取り合わせない。押せない理由は画面に出す
     $('gen').disabled = true;
-    $('gen-blocked').hidden = false;
 
     // 1通りに30秒以上かかることがある（1920x1080 の等倍で実測 28.6秒）。
     // n/N だけでは止まって見えるので、いま何を生成しているか・経過・見込みを出す
@@ -430,7 +457,6 @@
       $('search-run').disabled = false;
       $('search-stop').hidden = true;
       $('gen').disabled = false;
-      $('gen-blocked').hidden = true;
     });
   }
 
@@ -774,7 +800,7 @@
     sel.onchange = drawHeatmap;
 
     showDistances(ev);
-    ['step-result', 'step-distance', 'step-heatmap', 'step-generate']
+    ['step-result', 'step-distance', 'step-heatmap']
       .forEach(function (s) { $(s).hidden = false; });
     $('name').value = state.name;
     drawHeatmap();

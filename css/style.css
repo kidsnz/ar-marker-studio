@@ -74,24 +74,48 @@ code { background: var(--panel); padding: 0 0.25em; }
 .hint { color: var(--muted); font-size: 0.86em; }
 .row { display: flex; align-items: center; gap: 0.6rem; flex-wrap: wrap; }
 
-/* --- 入力 --- */
+/* --- 上の3列（画像 / 設定 / Generate）。本家 NFT-Marker-Creator と同じ並び --- */
+#step-top { border-bottom: 1px solid var(--line); }
+.stage {
+  display: flex; gap: 1.6rem; align-items: flex-start;
+  justify-content: center; flex-wrap: wrap;
+}
+.stagecol { flex: 0 1 360px; }
+.stagemid { flex: 0 1 320px; text-align: center; }
+.stagefoot { margin: 0.7rem 0 0; text-align: center; }
+.stagestat { justify-content: center; min-height: 1.4em; margin-top: 1rem; }
+
 #drop {
   border: 2px dashed var(--line);
   border-radius: 5px;
   background: var(--panel);
-  padding: 2.2rem 1rem;
+  min-height: 320px;
+  padding: 1rem;
+  display: flex; flex-direction: column; align-items: center; justify-content: center;
   text-align: center;
   cursor: pointer;
 }
 #drop:hover, #drop:focus-visible, #drop.over { border-color: var(--accent); color: var(--accent); }
 #drop p { margin: 0.2rem 0; }
+#drop.has-image p { display: none; }        /* 画像が入ったら文言は引っ込める */
 
-#imginfo { display: flex; gap: 1.4rem; align-items: flex-start; margin-top: 1.2rem; flex-wrap: wrap; }
 #preview {
-  max-width: 220px; max-height: 220px;
-  border: 2px dashed var(--line); border-radius: 5px;
-  image-rendering: pixelated;
+  max-width: 100%; max-height: 300px; width: auto;
+  border: 0; image-rendering: pixelated;
 }
+
+#opts-toggle {
+  border: 2px solid var(--line); border-radius: 999px;
+  padding: 0.4rem 1.1rem; font-weight: bold;
+}
+#opts-toggle[aria-expanded="true"] { border-color: var(--accent); color: var(--accent); }
+#step-config { margin-top: 1rem; text-align: left; }
+#step-config .grid { grid-template-columns: 1fr; gap: 0.7rem; }
+#step-config .sub { font-size: 0.78em; }
+#clear { border-color: var(--bad); color: var(--bad); border-radius: 5px; }
+#clear:hover { background: var(--bad); color: var(--bg); }
+
+#imgmeta { justify-content: center; margin-top: 1rem; font-size: 0.86em; }
 dl { margin: 0; display: grid; grid-template-columns: auto auto; gap: 0.1rem 1rem; }
 dt { color: var(--muted); }
 dd { margin: 0; }
@@ -125,11 +149,9 @@ button.primary[disabled] {
   opacity: 1; border-color: var(--bad); color: var(--bad); background: var(--bg);
 }
 
-/* Generate は大きなパネル。押せないあいだは赤い点線枠のまま（carnaux の初期状態） */
-.genrow { display: flex; gap: 1.6rem; align-items: stretch; flex-wrap: wrap; }
-.genfields { flex: 0 1 auto; }
+/* Generate は大きなパネル。押せないあいだは赤い点線枠のまま（carnaux と同じ約束） */
 .genpanel {
-  flex: 0 0 240px; min-height: 150px;
+  flex: 0 1 240px; min-height: 320px;
   border: 3px dashed var(--accent-soft); border-radius: 10px;
   background: transparent; color: var(--accent);
   font-size: 1.15rem; font-weight: bold; line-height: 1.4;
