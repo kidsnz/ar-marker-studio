@@ -630,29 +630,20 @@
   // 使える距離（ar2GetResolution2 と同じ考え方）
   // ------------------------------------------------------------------
   /**
-   * 距離の計算に使う画角。
+   * ARnft が標準で使う camera_para.dat から求めた画角。
+   * 640x480 基準で fx=609.37, fy=606.52 なので、
+   * 水平 2*atan(320/609.37) = 55.4度、垂直 2*atan(240/606.52) = 43.2度。
    *
-   * 【camera_para.dat の値を使ってはいけない】
-   * ARnft 同梱の camera_para.dat は iPhone 5 の 640x480 用（fx=609.37）で、
-   * ここから出る画角は長辺 55.4度・短辺 43.2度。これで距離を出すと、
-   * 72インチの絵が画面いっぱいになるのが 3.4m という答えになる。
-   * **実機とまるで合わない**（実際は 2m 前後）。camera_para.dat は姿勢計算のための
-   * 較正ファイルであって、いま使っている端末のレンズを表していない。
+   * 【実機で確認済み（2026-08-15）】
+   * iPhone 13 mini を縦持ちし、1m 離れて画面の左端から右端までを実測したところ
+   * **24インチ = 61.0cm**。この値から出る予測は 60.0cm で、誤差 1.6%。
+   * つまり camera_para.dat の画角は、いま使っている端末でもそのまま使える。
    *
-   * そこで実機で較正した値を使う。確認できた事実はこれ:
-   *   iPhone 13 mini を縦持ちしたとき、**距離とほぼ同じ幅が画面の横方向に見える**
-   *   （2m 離れると横に約 2m 見える）
-   * 72インチ幅(1829mm)の絵が 2m で画面の 89%、1.5m で 119% になる。実機の体感と一致。
-   *
-   * 【要確認】これは体感による較正なので、一度だけ実測で裏を取ること。
-   * やり方: 壁にメジャーを貼り、1m 離れて縦持ちで撮り、画面の左端から右端までが
-   * 何 cm 写っているかを読む。1.0m 前後なら下の値でよい。
+   * 一度これを「体感に合わせて」1.7倍に広げたことがあるが誤りだった。
+   * 体感の距離（絵の前で1.5〜2m）の方がずれていた。**実測が出たらそちらが正。**
+   * 別のレンズを使う場合は距離が比例してずれるので、その端末で測り直すこと。
    */
-  var VISIBLE_WIDTH_RATIO = 1.0254;   // 見える横幅 ÷ 距離（実機で較正）
-
-  // 参考: camera_para.dat から出る値。姿勢計算はこちらを使っているが、
-  // 距離の目安には使わない（上のとおり実機と合わないため）
-  var CAMERA_FOV_LONG = 55.4;
+  var CAMERA_FOV_LONG = 55.4;    // センサーの長辺方向の画角（度）
 
   /**
    * 処理キャンバス上での焦点距離（px）。
@@ -663,9 +654,8 @@
    * 素の [w, h] を渡されたときは長辺で代用する（短辺が切られる普通の場合は一致する）。
    */
   function focalPx(region) {
-    // 「見える横幅 = 距離 × VISIBLE_WIDTH_RATIO」を満たす焦点距離。
-    // 画面に見えている幅(region[0]) を基準にする
-    return region[0] / VISIBLE_WIDTH_RATIO;
+    var longPx = region[2] || Math.max(region[0], region[1]);
+    return (longPx / 2) / Math.tan(CAMERA_FOV_LONG / 2 * Math.PI / 180);
   }
 
   /** 距離 z(mm) から見たときの見かけ dpi */
@@ -884,8 +874,7 @@
     evaluate: evaluate, apparentDpi: apparentDpi, usablePoints: usablePoints,
     atDistance: atDistance, visible: visible, onCanvas: onCanvas,
     verdict: verdict, bandForDpi: bandForDpi,
-    CAMERA_FOV_LONG: CAMERA_FOV_LONG, VISIBLE_WIDTH_RATIO: VISIBLE_WIDTH_RATIO,
-    focalPx: focalPx, dpiAtDistance: dpiAtDistance,
+    CAMERA_FOV_LONG: CAMERA_FOV_LONG, focalPx: focalPx, dpiAtDistance: dpiAtDistance,
     fitDistance: fitDistance, distanceTable: distanceTable, usableRange: usableRange,
     convexHull: convexHull, spreadArea: spreadArea, pointsAt: pointsAt,
     selectable: selectable
