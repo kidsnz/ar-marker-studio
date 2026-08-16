@@ -224,7 +224,7 @@ python3 -m http.server 8000
 ```
 
 There is also a Python implementation of the same engine
-(`website/tools/predict_features.py`) that passes the same fixtures. **The two check each
+(`tools/predict_features.py`) that passes the same fixtures. **The two check each
 other.**
 
 ---
@@ -276,7 +276,22 @@ js/genworker.js     runs generation off the main thread (it freezes the tab othe
 js/app.js           page wiring
 vendor/             NFT-Marker-Creator build artifact (single asm.js file)
 test/               verification (fixtures.js / verify.js / verify.html)
+
+tools/              command-line tools (run independently of the browser app)
+  predict_features.py   Python port of the engine; cross-checks js/engine.js
+  parse_fset.py         scores an existing .fset; same criteria as js/fset.js
+  check_detection.py    runs the real WASM detector to measure actual detection
+  fix_fset3.py          adds a level to a .fset3
+  make_camera_para.py   rotates / scales camera_para.dat
+  nft_detect.js         detector wrapper used by check_detection.py
+  camera-check.html     open on a phone to measure the real camera pipeline
+docs/
+  ar-marker-guide.md    technical guide (14 chapters); the basis for the criteria
 ```
+
+The markers that `tools/` operates on live in a **sibling repository**
+(`../website/projects/atariar/markers/`). Run the commands from the
+ar-marker-studio root.
 
 No build tools. Plain HTML/CSS/JS: `git push` and it is live.
 

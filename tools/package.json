@@ -1,0 +1,12 @@
+{
+  "name": "ar-marker-tools",
+  "version": "1.0.0",
+  "private": true,
+  "description": "NFTマーカーが実際に検出されるかを測るための、本物の検出器（WASM）。入口は check_detection.py",
+  "scripts": {
+    "postinstall": "echo '準備完了。python3 tools/check_detection.py --self-test で検算できる'"
+  },
+  "dependencies": {
+    "@webarkit/jsartoolkit-nft": "1.10.1"
+  }
+}

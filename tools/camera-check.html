@@ -1,0 +1,179 @@
+<!doctype html>
+<html lang="ja">
+<head>
+<meta charset="utf-8">
+<title>カメラ実測（ATARI AR 調査用）</title>
+<meta name="viewport" content="width=device-width, initial-scale=1, maximum-scale=1, user-scalable=no">
+<style>
+  :root { color-scheme: dark; }
+  body { font-family: ui-monospace, monospace; background: #111; color: #ddd;
+         margin: 0; padding: 1rem 1rem 4rem; line-height: 1.55; }
+  h1 { font-size: 1rem; letter-spacing: .06em; margin: 0 0 .2rem; }
+  h2 { font-size: .9rem; margin: 1.4rem 0 .2rem; color: #8b949e; }
+  .hint { color: #8b949e; font-size: .78rem; }
+  button { font: inherit; background: #222; color: #ddd; border: 1px solid #666;
+           padding: .7rem 1.2rem; margin: .4rem .4rem .4rem 0; border-radius: 4px; }
+  table { border-collapse: collapse; width: 100%; margin: .4rem 0; }
+  th, td { padding: .25rem .35rem; border-bottom: 1px solid #2c2c2c;
+           font-size: .82rem; text-align: right; }
+  th { color: #888; font-weight: normal; text-align: left; }
+  .big { font-size: 1.25rem; color: #58a6ff; }
+  .ng { color: #f85149; } .ok { color: #3fb950; }
+  pre { background: #000; padding: .5rem; font-size: .72rem; white-space: pre-wrap;
+        word-break: break-all; }
+</style>
+</head>
+<body>
+<h1>カメラ実測（ATARI AR 調査用）</h1>
+<p class="hint">ARnft が実際に何ピクセルで検出しているかを、この端末で確かめる。
+   AR は動かさない。<b>本番とまったく同じ条件</b>でカメラを開いて数字を出す。</p>
+
+<p>
+  <button id="prod">本番と同じ条件で測る</button>
+  <button id="alt">幅と高さの両方を指定して測る</button>
+  <button id="free">制約なしで測る</button>
+</p>
+<p class="hint" id="status">まず「本番と同じ条件」を押してください。</p>
+
+<div id="out"></div>
+<h2>カメラの一覧（本番はこの中から選ぶ）</h2>
+<pre id="devices">（まだ測っていません）</pre>
+<video id="v" playsinline muted autoplay style="width:38%;border:1px solid #444"></video>
+
+<script>
+// ============================================================
+// 本番（ARnft の CameraViewRenderer.initialize）が実際に組み立てる制約。
+// 縮小化された js/ARnft.js から書き写したもの:
+//   const I = { audio:false,
+//               video:{ facingMode: this._facing,
+//                       width:{ min:A.width.min, max:A.width.max } } };
+//   if (navigator.mediaDevices.enumerateDevices) {
+//     ... videoinput の deviceId を並べ、2つ以上あれば
+//     I.video.deviceId = { exact: g[g.length - 1] }        ← **最後の1つを強制**
+//   }
+// 【重要】height は渡していない。縦横比は端末任せ。
+// そして deviceId を強制するので facingMode は事実上無効になる。
+// ============================================================
+// 本番の設定を直接読む。値を写して埋め込むと、本番を変えたときにこのページだけ
+// 古い条件で測り続けることになる（このページの存在意義が壊れる）。
+// 別ドメインだが Access-Control-Allow-Origin: * が返るので取得できる（2026-08-16 実測）。
+// 取得に失敗したときは下の catch が赤字で「失敗」を出す。誤った値では測らない。
+const CONFIG_URL = 'https://murakamishinji.com/projects/atariar/config.json';
+
+async function constraintsProduction(cfg) {
+  const c = { audio: false,
+              video: { facingMode: cfg.videoSettings.facingMode || 'environment',
+                       width: { min: cfg.videoSettings.width.min,
+                                max: cfg.videoSettings.width.max } } };
+  if (navigator.mediaDevices.enumerateDevices) {
+    const list = await navigator.mediaDevices.enumerateDevices();
+    const ids = list.filter((d) => d.kind === 'videoinput').map((d) => d.deviceId);
+    if (ids.length > 1) c.video.deviceId = { exact: ids[ids.length - 1] };
+  }
+  return c;
+}
+async function constraintsAlt(cfg) {
+  return { audio: false, video: cfg.videoSettings };      // 幅も高さも指定（前回の測り方）
+}
+async function constraintsFree() {
+  return { audio: false, video: { facingMode: 'environment' } };
+}
+
+// ARnft の CameraViewRenderer.prepareImage() をそのまま写したもの（改造前）
+function prepareImageOriginal(vw, vh) {
+  const s = 320 / Math.max(vw, (vh / 3) * 4);
+  const w = Math.floor(vw * s), h = Math.floor(vh * s);
+  const pw = Math.floor(Math.max(w, (h / 3) * 4));
+  const ph = Math.floor(Math.max(h, (w / 4) * 3));
+  return { w, h, pw, ph, ox: Math.floor((pw - w) / 2), oy: Math.floor((ph - h) / 2) };
+}
+
+const $ = (id) => document.getElementById(id);
+const MARKER = { w: 307, h: 219 };        // satoshi-tomiie-bassline のジャケット(mm)
+let current = null;
+
+function render(label, vw, vh, track) {
+  const p = prepareImageOriginal(vw, vh);
+  const bars = p.ox > 0 || p.oy > 0;
+  const aspect = vw / vh;
+  const is43 = Math.abs(Math.min(aspect, 1 / aspect) - 0.75) < 0.02;
+
+  // 画面に実際に映っている映像の範囲（object-fit: cover の逆算）。
+  // 映像要素の実寸を使う。window.innerHeight は iOS のアドレスバーで動くので当てにしない
+  const el = $('v');
+  const box = { w: window.innerWidth, h: window.innerHeight };
+  const ds = Math.max(box.w / vw, box.h / vh);
+  const visW = Math.min(vw, Math.round(box.w / ds));
+  const visH = Math.min(vh, Math.round(box.h / ds));
+
+  const scale = Math.min(p.w / MARKER.w, p.h / MARKER.h);
+  const rows = [
+    ['測った条件', label],
+    ['カメラが返す映像', `<span class="big">${vw} x ${vh}</span>`],
+    ['縦横比', `<span class="${is43 ? 'ok' : 'ng'}">${aspect.toFixed(3)}`
+               + (is43 ? '（4:3）' : '（4:3ではない）') + '</span>'],
+    ['— 今の本番 —', ''],
+    ['検出器に渡る画像', `${p.pw} x ${p.ph}`],
+    ['そのうち映像の部分', `<span class="${bars ? 'ng' : 'ok'}">${p.w} x ${p.h}</span>`],
+    ['黒帯', bars ? `<span class="ng">左右 ${p.ox}px / 上下 ${p.oy}px</span>`
+                  : '<span class="ok">なし</span>'],
+    ['マーカーが画面いっぱいのとき', `${Math.round(scale * MARKER.w)} px 幅`],
+    ['— 画面と映像の関係 —', ''],
+    ['画面（CSS px）', `${box.w} x ${box.h}`],
+    ['画面に映っている映像', `${visW} x ${visH}`],
+    ['見えている幅の割合', `<span class="big">${Math.round(visW / vw * 100)}%</span>`],
+    ['画面の向き', (screen.orientation && screen.orientation.type) || '不明'],
+    ['画素密度', String(window.devicePixelRatio)],
+    ['カメラの実際の設定', track
+      ? `${track.width}x${track.height} @${track.frameRate || '?'}fps`
+      : '-'],
+    ['使われたカメラ', (track && track.deviceId ? track.deviceId.slice(0, 12) + '…' : '-')]
+  ];
+  $('out').innerHTML = '<table>' + rows.map(
+    (r) => `<tr><th>${r[0]}</th><td>${r[1]}</td></tr>`).join('') + '</table>';
+}
+
+async function measure(label, makeConstraints) {
+  $('status').textContent = 'カメラを開いています…';
+  try {
+    const cfg = await fetch(CONFIG_URL).then((r) => r.json());
+    if (current) { current.getTracks().forEach((t) => t.stop()); current = null; }
+    const c = await makeConstraints(cfg);
+    const stream = await navigator.mediaDevices.getUserMedia(c);
+    current = stream;
+    const v = $('v');
+    v.srcObject = stream;
+    await v.play();
+    for (let i = 0; i < 60 && !v.videoWidth; i++) await new Promise((r) => setTimeout(r, 50));
+    const track = stream.getVideoTracks()[0];
+    const st = track.getSettings ? track.getSettings() : null;
+    if (!v.videoWidth) throw new Error('映像の大きさが取れない');
+    render(label, v.videoWidth, v.videoHeight, st);
+    $('status').innerHTML = '測定できました。<b>端末を横に倒すと数字が変わるか</b>も見てください。'
+      + '<br>使った制約: <code>' + JSON.stringify(c.video) + '</code>';
+
+    const list = await navigator.mediaDevices.enumerateDevices();
+    $('devices').textContent = list.filter((d) => d.kind === 'videoinput')
+      .map((d, i, a) => `${i}: ${d.label || '(名前なし)'}  ${d.deviceId.slice(0, 16)}…`
+        + (i === a.length - 1 ? '   ← 本番はこれを強制的に使う' : '')).join('\n')
+      || '（列挙できませんでした）';
+  } catch (e) {
+    $('status').innerHTML = '<span class="ng">失敗: '
+      + (e && e.message ? e.message : e) + '</span>';
+  }
+}
+
+$('prod').addEventListener('click', () => measure('本番と同じ', constraintsProduction));
+$('alt').addEventListener('click', () => measure('幅と高さの両方', constraintsAlt));
+$('free').addEventListener('click', () => measure('制約なし', constraintsFree));
+
+// 向きが変わったら測り直す
+window.addEventListener('orientationchange', () => {
+  if (current) setTimeout(() => {
+    const v = $('v');
+    if (v.videoWidth) render('（回転後）', v.videoWidth, v.videoHeight, null);
+  }, 600);
+});
+</script>
+</body>
+</html>

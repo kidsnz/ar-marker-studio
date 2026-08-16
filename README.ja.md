@@ -211,7 +211,7 @@ node test/verify.js ../website/projects/atariar/markers
 python3 -m http.server 8000
 ```
 
-判定エンジンには Python 版（`website/tools/predict_features.py`）もあり、
+判定エンジンには Python 版（`tools/predict_features.py`）もあり、
 同じ期待値で `--self-test` が通る。**この2つは互いの答え合わせになっている。**
 
 ---
@@ -257,7 +257,22 @@ js/genworker.js     生成を別スレッドで回す（メインで回すとタ
 js/app.js           画面まわり
 vendor/             NFT-Marker-Creator の成果物（asm.js 単一ファイル）
 test/               検算（fixtures.js / verify.js / verify.html）
+
+tools/              コマンドラインの道具（ブラウザ版とは独立に動く）
+  predict_features.py   判定エンジンの Python 版。js/engine.js と相互検算する
+  parse_fset.py         生成済みの .fset を採点する。js/fset.js と同じ基準
+  check_detection.py    本物の検出器(WASM)に通して「認識するか」を測る
+  fix_fset3.py          .fset3 の段を足す
+  make_camera_para.py   camera_para.dat を回転・縮小する
+  nft_detect.js         検出器の呼び出し（check_detection.py が使う）
+  camera-check.html     スマホで開いてカメラの実測値を出す（本番の設定を読む）
+docs/
+  ar-marker-guide.md    技術ガイド（全14章）。判定基準の根拠はここ
 ```
+
+`tools/` が扱うマーカーの実体は、**隣に並ぶ website リポジトリ**の中にある
+（`../website/projects/atariar/markers/`）。道具と作品を分けているため、
+コマンドは ar-marker-studio のルートで実行する。
 
 ビルドツールは使わない。素の HTML/CSS/JS で、`git push` すればそのまま公開される。
 

@@ -1,3 +1,10 @@
 # Step 0/2 の測定用。ARnft.js と作品のマーカー画像を含むので公開しない
 spike/
 preview-short.html
+
+# macOS
+.DS_Store
+
+# NFT検出器の実体（49MB。cd tools && npm install で入る）
+tools/node_modules/
+tools/package-lock.json

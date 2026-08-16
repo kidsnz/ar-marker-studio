@@ -3,6 +3,36 @@
 このファイルの書き方は [Keep a Changelog](https://keepachangelog.com/ja/1.1.0/)、
 バージョンの付け方は [Semantic Versioning](https://semver.org/lang/ja/) に従う。
 
+## [2.8.0] - 2026-08-16
+
+### 追加
+- **コマンドラインの道具と技術ガイドを取り込んだ。** これまで website リポジトリの中に
+  あったもので、道具が2つのリポジトリに分かれていた。判定の Python 版はこの
+  ブラウザ版と相互検算する関係にあり、離れている理由が無かった
+  - `tools/predict_features.py` … `js/engine.js` と同じ計算の Python 版。同じ期待値で検算する
+  - `tools/parse_fset.py` … 生成済みの `.fset` を採点する。`js/fset.js` と同じ基準
+  - `tools/check_detection.py` … 本物の検出器(WASM)に通して「認識するか」を実測する
+  - `tools/fix_fset3.py` / `tools/make_camera_para.py` / `tools/nft_detect.js`
+  - `tools/camera-check.html` … スマホで開いてカメラの実測値を出す
+  - `docs/ar-marker-guide.md` … 技術ガイド（全14章）。判定基準の根拠はここにある
+
+### 変更
+- **道具が扱うマーカーの実体は、隣に並ぶ website リポジトリにある**（`../website/`）。
+  各スクリプトの基準パスを5箇所直した（`parse_fset.py` `predict_features.py`
+  `check_detection.py` `fix_fset3.py` `make_camera_para.py`）。
+  移動の前後で `--self-test` が5本とも同じ「すべて合格」になることを確認済み
+- `tools/camera-check.html` は本番の設定を**絶対URLで**読む
+  （`https://murakamishinji.com/projects/atariar/config.json`）。
+  値を写して埋め込むと本番を変えたときに古い条件で測り続けるため。
+  別ドメインだが `Access-Control-Allow-Origin: *` が返ることを実測で確認した
+- README の構成に `tools/` と `docs/` を追記
+- `.gitignore` に `tools/node_modules/`（49MB）と `.DS_Store` を追加
+
+### 公開URLは変えていない
+アプリ本体（`index.html` `css/` `js/` `vendor/`）は動かしていないので、
+https://kidsnz.github.io/ar-marker-studio/ はそのまま。
+`camera-check.html` だけ `.../ar-marker-studio/tools/camera-check.html` に変わる
+
 ## [2.7.0] - 2026-08-15
 
 ### 変更
