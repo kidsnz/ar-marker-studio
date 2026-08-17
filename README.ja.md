@@ -243,6 +243,13 @@ truncf( (28.0f / 短辺) * dpi * 1000.0 ) / 1000.0f
 
 `js/engine.js` は C が float で計算している箇所を `Math.fround()` で1段ずつ丸めている。
 
+
+## 手元で速く動かす（任意）
+
+`start-local.command` をダブルクリックすると、生成だけを手元の Node が引き受ける
+ローカル版が立ち上がる。**生成 1 回が 12.0 秒 → 4.2 秒**（実測）。
+判定・ヒートマップ・探索は公開版とまったく同じ。詳細は [`local/README.md`](local/README.md)。
+
 ## 構成
 
 ```
@@ -268,6 +275,11 @@ tools/              コマンドラインの道具（ブラウザ版とは独立
   camera-check.html     スマホで開いてカメラの実測値を出す（本番の設定を読む）
 docs/
   ar-marker-guide.md    技術ガイド（全14章）。判定基準の根拠はここ
+
+local/              手元でだけ速く動かすモード（生成を Node に肩代わりさせる）
+  server.js / worker.js / local-boost.js
+  vendor/NftMarkerCreator_wasm.thread.js   webarkit 版の生成器（525KB）
+start-local.command ↑ をダブルクリックで起動する
 ```
 
 `tools/` が扱うマーカーの実体は、**隣に並ぶ website リポジトリ**の中にある
