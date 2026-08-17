@@ -3,7 +3,7 @@
  * 画面は ar-marker-studio をそのまま配り、生成だけ手元の Node に肩代わりさせる。
  * ブラウザ内の生成は 12 秒かかるが、Node のスレッド版なら 4 秒で終わる（実測）。
  *
- * 使い方:  start-local.command をダブルクリック
+ * 使い方:  local-start▶️.command をダブルクリック
  *          （手で動かすなら  node local/server.js  でも同じ）
  *
  * サーバが居ない環境では、公開版と同じくブラウザ内生成に自動で戻る。

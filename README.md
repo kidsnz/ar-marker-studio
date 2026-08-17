@@ -264,7 +264,7 @@ downstream matches.
 
 ## Running it locally, faster (optional)
 
-Double-click `start-local.command` to start a local mode where the generation step
+Double-click `local-start▶️.command` to start a local mode where the generation step
 runs on your own Node instead of in the browser: **12.0s → 4.2s per generation**
 (measured). The quality check, heatmaps and search are identical to the hosted
 version. See [`local/README.md`](local/README.md).
@@ -299,7 +299,7 @@ docs/
 local/              local-only fast mode (generation runs on your own Node)
   server.js / worker.js / local-boost.js
   vendor/NftMarkerCreator_wasm.thread.js   the webarkit generator (525KB)
-start-local.command double-click this to start it
+local-start▶️.command double-click this to start it
 ```
 
 The markers that `tools/` operates on live in a **sibling repository**

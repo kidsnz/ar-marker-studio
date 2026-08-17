@@ -246,7 +246,7 @@ truncf( (28.0f / 短辺) * dpi * 1000.0 ) / 1000.0f
 
 ## 手元で速く動かす（任意）
 
-`start-local.command` をダブルクリックすると、生成だけを手元の Node が引き受ける
+`local-start▶️.command` をダブルクリックすると、生成だけを手元の Node が引き受ける
 ローカル版が立ち上がる。**生成 1 回が 12.0 秒 → 4.2 秒**（実測）。
 判定・ヒートマップ・探索は公開版とまったく同じ。詳細は [`local/README.md`](local/README.md)。
 
@@ -279,7 +279,7 @@ docs/
 local/              手元でだけ速く動かすモード（生成を Node に肩代わりさせる）
   server.js / worker.js / local-boost.js
   vendor/NftMarkerCreator_wasm.thread.js   webarkit 版の生成器（525KB）
-start-local.command ↑ をダブルクリックで起動する
+local-start▶️.command ↑ をダブルクリックで起動する
 ```
 
 `tools/` が扱うマーカーの実体は、**隣に並ぶ website リポジトリ**の中にある
