@@ -140,15 +140,22 @@ def run_detector(marker, camera, frames, attempts, cwd):
             with open(p, 'wb') as f:
                 f.write(data)
             paths.append(p)
+        # マーカーとカメラは一時フォルダに写し、そこを起点にして検出器に読ませる。
+        # 検出器は cwd からの相対パスでしか読めず、cwd の外のマーカーを渡すと
+        # **エラーを出さずに全条件「失敗」を返す**（2026-11-13 に踏んだ。実機で動く
+        # マーカーまで「認識しない」と出た）。写せば、どこにあるマーカーでも同じに測れる。
+        # ファイルが欠けていれば、ここで FileNotFoundError になって止まる
+        for ext in ('fset', 'fset3', 'iset'):
+            shutil.copyfile(marker + '.' + ext, os.path.join(tmp, 'marker.' + ext))
+        shutil.copyfile(camera, os.path.join(tmp, 'camera_para.dat'))
         out = os.path.join(tmp, 'result.json')
         job = os.path.join(tmp, 'job.json')
         with open(job, 'w') as f:
-            json.dump({'marker': os.path.relpath(marker, cwd),
-                       'camera': os.path.relpath(camera, cwd),
+            json.dump({'marker': 'marker', 'camera': 'camera_para.dat',
                        'width': CANVAS[0], 'height': CANVAS[1],
                        'attempts': attempts, 'frames': paths, 'out': out}, f)
 
-        proc = subprocess.run(['node', NODE_SCRIPT, job], cwd=cwd,
+        proc = subprocess.run(['node', NODE_SCRIPT, job], cwd=tmp,
                               capture_output=True, text=True)
         if not os.path.exists(out):
             raise RuntimeError('検出器が結果を返さなかった\n'

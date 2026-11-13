@@ -28,7 +28,7 @@
     'meta.color': 'Colour',
     'meta.format': 'Format',
     'meta.gray': 'greyscale (r=g=b)',
-    'meta.rgb': 'colour → converted with (r+g+b)/3',
+    'meta.rgb': 'colour → converted to grey the way the camera does, (3r+4g+b)/8',
     'meta.png': 'PNG (decoded here, so values match the generator exactly)',
     'meta.jpeg': 'JPEG (decoded by canvas; values differ slightly from the generator)',
     'cfg.standAt': '\u2192 use it from {near} to {far} away (that is where it spans {lo}\u2013{hi}px, the target)',
@@ -183,8 +183,11 @@
       if (isPNG) return PNGReader.decode(buf);
       return decodeViaCanvas(file);
     }).then(function (img) {
-      state.rgba = img.data; state.W = img.width; state.H = img.height;
-      state.orig = { rgba: img.data, W: img.width, H: img.height };
+      // 判定・探索・生成には、カメラと同じ式で白黒にした絵を使う（Engine.cameraGray に理由）。
+      // 色のままの絵はプレビューにだけ使う
+      var gray = Engine.cameraGray(img.data, img.width, img.height);
+      state.rgba = gray; state.W = img.width; state.H = img.height;
+      state.orig = { rgba: gray, color: img.data, W: img.width, H: img.height };
       state.scale = 1;
       state.isPNG = isPNG;
       state.detect = null;              // 画像を変えたら前の検出結果は捨てる
@@ -221,10 +224,13 @@
   function showImage() {
     var cv = $('preview');
     cv.width = state.W; cv.height = state.H;
-    var id = new ImageData(new Uint8ClampedArray(state.rgba), state.W, state.H);
+    // プレビューは色のまま見せる（作業中の倍率に合わせて、元の色の絵から拡大する）
+    var o = state.orig;
+    var view = state.scale > 1 ? Search.upscale(o.color, o.W, o.H, state.scale).rgba : o.color;
+    var id = new ImageData(new Uint8ClampedArray(view), state.W, state.H);
     cv.getContext('2d').putImageData(id, 0, 0);
 
-    var info = Engine.toBW(state.rgba, state.W, state.H);
+    var info = Engine.toBW(o.color, o.W, o.H);   // 「色」の欄とアルファの警告は、元の絵で判断する
     $('imgmeta').innerHTML =
       row(t('meta.size'), state.W + ' × ' + state.H)
       + (state.scale > 1

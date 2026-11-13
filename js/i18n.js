@@ -31,7 +31,7 @@
     'meta.color': '色',
     'meta.format': '形式',
     'meta.gray': 'グレースケール（r=g=b）',
-    'meta.rgb': 'カラー → (r+g+b)/3 で白黒化',
+    'meta.rgb': 'カラー → カメラと同じ式 (3r+4g+b)/8 で白黒化',
     'meta.png': 'PNG（自前でデコード＝生成器と同じ値）',
     'meta.jpeg': 'JPEG（canvas でデコード。生成器と数値がわずかに違う）',
     'meta.scale': '拡大',

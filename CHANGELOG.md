@@ -3,6 +3,39 @@
 このファイルの書き方は [Keep a Changelog](https://keepachangelog.com/ja/1.1.0/)、
 バージョンの付け方は [Semantic Versioning](https://semver.org/lang/ja/) に従う。
 
+## [2.10.0] - 2026-11-13
+
+### 変更
+- **色の絵は、カメラと同じ式で白黒にしてから判定・探索・生成するようにした。**
+  生成器は色の絵を `(r+g+b)/3` で白黒にするが、ARnft はカメラの映像を `(3r+4g+b)>>3` で
+  白黒にする（ARnft の `_copyImageToHeap`）。式が違うと、カメラには見えている色の境目を
+  生成器が見落とす。読み込んだ直後に `Engine.cameraGray` で白黒にし、以後はそれを使う。
+  プレビューは色のまま。「色」の欄は「カメラと同じ式 (3r+4g+b)/8 で白黒化」と出る
+  - 生成器のまねをしている `toBW` と、その検算（`test/verify.js`）には触っていない。
+    r=g=b の絵を渡すので、生成器も予測も「グレースケール」の同じ道を通る
+
+### 修正
+- **`tools/check_detection.py` が、website の外のマーカーを渡されると、エラーを出さずに
+  全条件「失敗」を返していた。** 検出器が cwd からの相対パスでしか読めないため。
+  マーカーとカメラを一時フォルダに写してから読ませるようにした。ファイルが欠けていれば止まる
+
+### 実測して分かったこと
+- **紫と水色の Pizza Boy（実機で全く反応しなかった絵）が、この変更だけで動いた。**
+  検出の手がかり（縦持ちで使う帯）が 4 → 208 点。実機（iPhone）で横幅13cmに映して43cmまで追えた
+- **もともと動いていた絵は、実機で変わらなかった。** emoticons/01 は横幅13cmで 37cm → 37cm、
+  pizzaboy/05 は14cmで 39cm → 39cm
+- 合成した映像での測定（公開中の23本 × 84条件）: 通った条件の合計 763 → 825。
+  ただし ±1〜4 の差は測る大きさを少しずらすだけで入れ替わる誤差の範囲で、
+  はっきり効くのは色の鮮やかな絵だけ。合成した映像はカメラの式とぴったり合う絵なので、
+  この変更に有利な測り方でもある（実機で距離が変わらなかったのと合う）
+- 明暗を全体に広げる（ヒストグラム平坦化）を足すと、23本中12本で悪くなった。入れていない
+- 検出器の不具合への対処（`fix_fset3.py` のダミー段）は、紫の絵には効かなかった
+- 実験一式は `spike/camera-gray/`（git の管理外）
+
+### 未対応
+- `tools/predict_features.py` は、いまも生成器と同じ `(r+g+b)/3` で予測する。
+  Studio と同じ数字を出すには、絵を先にカメラの式で白黒にしてから渡す
+
 ## [2.9.0] - 2026-08-17
 
 ### 追加
@@ -399,6 +432,9 @@ Python の `zipfile` と macOS の `unzip` の両方で開けること、
 - 本物の生成器をブラウザ内で走らせる生成機能
 - 英語・日本語の切り替え
 
+[2.10.0]: https://github.com/kidsnz/ar-marker-studio/compare/v2.9.0...v2.10.0
+[2.9.0]: https://github.com/kidsnz/ar-marker-studio/compare/v2.8.0...v2.9.0
+[2.8.0]: https://github.com/kidsnz/ar-marker-studio/compare/v2.7.0...v2.8.0
 [2.7.0]: https://github.com/kidsnz/ar-marker-studio/compare/v2.6.0...v2.7.0
 [2.6.0]: https://github.com/kidsnz/ar-marker-studio/compare/v2.5.0...v2.6.0
 [2.5.0]: https://github.com/kidsnz/ar-marker-studio/compare/v2.4.0...v2.5.0

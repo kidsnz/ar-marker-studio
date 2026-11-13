@@ -223,6 +223,30 @@
     return { bw: bw, nc: gray ? 1 : 3, hasAlpha: hasAlpha };
   }
 
+  /**
+   * カラーの絵を、**カメラと同じ式**で白黒にした RGBA を返す（r=g=b、アルファはそのまま）。
+   *
+   * 生成器は色の絵を (r+g+b)/3 で白黒にするが、ARnft はカメラの映像を
+   * (3r+4g+b)>>3 で白黒にする（ARnft の _copyImageToHeap）。式が違うと、
+   * カメラには見えている色の境目を、生成器が見落とす。
+   * 実測（2026-11-13）: 紫と水色の Pizza Boy は (r+g+b)/3 だと検出の手がかりが 4 点で
+   * 実機で全く出なかった。この式で白黒にしてから渡すと 208 点になり、実機で出た。
+   * もともと動いていた絵（emoticons/01・pizzaboy/05）は、実機で離れられる距離が同じだった。
+   *
+   * r=g=b の絵を渡すので、生成器も toBW も「グレースケール」の道を通り、
+   * 予測と生成は同じ白黒の絵を見ることになる。
+   */
+  function cameraGray(rgba, W, H) {
+    var out = new Uint8ClampedArray(W * H * 4), i, p, v;
+    for (i = 0; i < W * H; i++) {
+      p = i * 4;
+      v = (3 * rgba[p] + 4 * rgba[p + 1] + rgba[p + 2]) >> 3;
+      out[p] = out[p + 1] = out[p + 2] = v;
+      out[p + 3] = rgba[p + 3];
+    }
+    return out;
+  }
+
   // ------------------------------------------------------------------
   // 距離帯（ar2GenImageSet / genTexData の setDPI）
   // ------------------------------------------------------------------
@@ -890,7 +914,7 @@
     visibleFraction: visibleFraction, regionFor: regionFor,
     GOOD: GOOD, POOR: POOR, STABLE_SPREAD: STABLE_SPREAD,
     TRACK_MIN: TRACK_MIN, TRACK_PER_FRAME: TRACK_PER_FRAME, EDGE_MARGIN: EDGE_MARGIN,
-    toBW: toBW, dpiLevels: dpiLevels, scaleImage: scaleImage, bandRanges: bandRanges,
+    toBW: toBW, cameraGray: cameraGray, dpiLevels: dpiLevels, scaleImage: scaleImage, bandRanges: bandRanges,
     featureMap: featureMap, selectFeatures: selectFeatures, predict: predict,
     evaluate: evaluate, apparentDpi: apparentDpi, usablePoints: usablePoints,
     atDistance: atDistance, visible: visible, onCanvas: onCanvas,
